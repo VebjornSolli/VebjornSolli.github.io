@@ -1,18 +1,4 @@
-# VebjornSolli.github.io
-
-<div class="mermaid">
-<head>
-  <meta charset="utf-8" />
-  <title><Geoteknisk modellering></title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
-    .mermaid { margin-top: 1rem; }
-  </style>
-</head>
-<body>
-
-<h1>Valg av geoteknisk modelleringsverktøy og hjelpemiddel</h1>
+## Valg av geoteknisk modelleringsverktøy og hjelpemiddel
 
 <pre class="mermaid">
 flowchart LR
@@ -41,7 +27,6 @@ flowchart LR
   M --> O[Tørrmur]
   M --> P[Fylling]
 
-  %% Clickable links (nodeId "URL" "tooltip" target)
   click E "javascript:void(0)" "Modellere en teoretisk bergoverflate" _blank
   click F "javascript:void(0)" "GOM, modellere volumer for løsmasser og berg" _blank
   click I "https://multiconsultas.sharepoint.com/sites/KNV-Geoteknikk/_layouts/15/Doc.aspx?sourcedoc={e85bab41-bc5b-4a09-9e75-866069919056}&action=edit&wd=target%281.%20Grunnlagsmodeller.one%7C383eba00-1468-436d-b187-12d85e37c390%2F1.2%20Bergmodell%7C01dc91f5-8d70-4674-82b3-70abfde384d0%2F%29&wdorigin=NavigationUrl" "OneNote om bergmodell" _blank
@@ -51,16 +36,9 @@ flowchart LR
 </pre>
 
 <script type="module">
-  // Load Mermaid via ESM (recommended in official docs)
-  // jsDelivr example; you can pin a version instead of "latest" for stability.
-  // See docs: https://www.jsdelivr.com/package/npm/mermaid
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@latest/dist/mermaid.esm.min.mjs';
-
-  // Enable links and click callbacks by lowering the security level.
-  // (Mermaid restricts interactivity by default for safety.)
-  // Docs: "Enabling Click Event and Tags in Nodes" under Usage.
   mermaid.initialize({
     startOnLoad: true,
-    securityLevel: 'loose'   // allows URLs and HTML in labels/click callbacks
+    securityLevel: 'loose'
   });
 </script>
