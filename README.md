@@ -1,4 +1,4 @@
-# KNV-Geoteknikk.github.io
+# VebjornSolli.github.io
 
 ## Innhold
 - [Flytskjema – geoteknisk modellering](./flowchart.html)
