@@ -1,7 +1,7 @@
 ## Valg av geoteknisk modelleringsverktøy og hjelpemiddel
 
 <pre class="mermaid">
-flowchart LR
+flowchart TD
   A([Start]) --> B{Type modell?}
   B --> C[Grunnlagsmodell]
   B --> D[Fagmodell]
