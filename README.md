@@ -1,5 +1,5 @@
-# VebjornSolli.github.io
+# KNV-Geoteknikk.github.io
 
-## Sider
+## Innhold
 - [Flytskjema – geoteknisk modellering](./flowchart.html)
 - [Parametrisk 3D-modellering](./3D-modell.html)
