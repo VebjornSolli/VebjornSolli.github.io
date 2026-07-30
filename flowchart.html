@@ -1,0 +1,23 @@
+---
+---
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <div class="mermaid">
+    flowchart TD
+        A[Start] --> B{Beslutning?}
+        B -->|Ja| C[Resultat 1]
+        B -->|Nei| D[Resultat 2]
+        click C "https://example.com/resultat1" "Tooltip"
+        click D "https://example.com/resultat2" _blank
+  </div>
+  <script>
+    mermaid.initialize({ startOnLoad: true });
+  </script>
+</body>
+</html>
+Commit changes direkte til main-branchen.
