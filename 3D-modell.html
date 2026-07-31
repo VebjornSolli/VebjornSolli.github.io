@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>Parametrisk 3D — geometrisk input</title>
+<style>
+  :root{
+    --bg: #0e1113;
+    --panel: #16191c;
+    --panel-2: #1d2226;
+    --line: #2a3034;
+    --text: #d8dee2;
+    --text-dim: #7c868c;
+    --accent: #4fb0ae;
+    --accent-2: #e8a33d;
+    --mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+    --sans: "Inter", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); overflow: hidden; }
+  #app { display: flex; height: 100vh; width: 100vw; }
+
+  #panel {
+    width: 320px; min-width: 320px; background: var(--panel);
+    border-right: 1px solid var(--line); display: flex; flex-direction: column;
+    padding: 18px 18px 12px; overflow-y: auto;
+  }
+  #panel h1 {
+    font-family: var(--mono); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-dim); margin: 0 0 2px;
+  }
+  #panel h1 span { color: var(--accent); }
+  #panel .sub { font-size: 11px; color: var(--text-dim); margin-bottom: 18px; }
+
+  .field { margin-bottom: 10px; }
+  .field label { display:block; font-size: 11px; color: var(--text-dim); margin-bottom: 4px; font-family: var(--mono); }
+  .row { display: flex; gap: 8px; }
+  select, input[type=number], input[type=text] {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    padding: 7px 8px; border-radius: 4px; font-family: var(--mono); font-size: 12.5px;
+  }
+  input[type=file] {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text-dim);
+    padding: 6px; border-radius: 4px; font-family: var(--mono); font-size: 10.5px;
+  }
+  select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+  button {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .03em; border-radius: 4px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    padding: 9px 10px; cursor: pointer; transition: border-color .15s, color .15s;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  #addBtn { width: 100%; margin-top: 6px; background: var(--accent); color: #08201f; border: none; font-weight: 600; }
+  #addBtn:hover { opacity: .88; color: #08201f; }
+
+  hr { border: none; border-top: 1px solid var(--line); margin: 16px 0; }
+
+  #objList { flex: 1; overflow-y: auto; }
+  .obj-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 9px; border: 1px solid var(--line); border-radius: 4px; margin-bottom: 6px;
+    font-family: var(--mono); font-size: 11.5px; background: var(--panel-2);
+  }
+  .obj-item.selected { border-color: var(--accent); }
+  .obj-item .meta { color: var(--text-dim); font-size: 10.5px; }
+  .obj-item .name { color: var(--text); cursor: pointer; }
+  .obj-item .del { color: var(--text-dim); cursor: pointer; padding: 0 4px; }
+  .obj-item .del:hover { color: #d9645f; }
+
+  .prop-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .prop-row input { flex: 1; }
+  .prop-row .del { color: var(--text-dim); cursor: pointer; padding: 0 4px; font-family: var(--mono); }
+  .prop-row .del:hover { color: #d9645f; }
+
+  #details {
+    display: none; background: var(--panel-2); border: 1px solid var(--accent);
+    border-radius: 4px; padding: 10px 11px; margin-bottom: 12px;
+  }
+  .details-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .details-title { font-family: var(--mono); font-size: 12.5px; color: var(--accent); font-weight: 600; }
+  .meta-row {
+    display: flex; justify-content: space-between; gap: 10px; font-family: var(--mono);
+    font-size: 11px; color: var(--text); padding: 2px 0;
+  }
+  .meta-row span:first-child { color: var(--text-dim); }
+  #canvasWrap canvas { cursor: pointer; }
+
+  #exportRow { display:flex; gap: 8px; margin-top: 10px; }
+  #exportRow button { flex: 1; }
+
+  #canvasWrap { position: relative; flex: 1; }
+  canvas { display: block; }
+
+  #hud {
+    position: absolute; top: 14px; left: 14px; font-family: var(--mono); font-size: 11px;
+    color: var(--text-dim); background: rgba(14,17,19,.55); padding: 6px 10px; border-radius: 4px;
+    border: 1px solid var(--line); pointer-events: none;
+  }
+  #hud b { color: var(--accent); }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="panel">
+    <h1>parametrisk<span>_3d</span></h1>
+    <div class="sub">generer geometri fra tall — ingen tung CAD nødvendig</div>
+
+    <div class="field">
+      <label>importer rør fra fil (txt / csv / xlsx)</label>
+      <input type="file" id="pipeFile" accept=".txt,.csv,.xlsx,.xls">
+      <div id="importStatus" style="font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); margin-top: 5px;"></div>
+      <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 6px; line-height: 1.5;">
+        kolonner: X, Y, (Z/kote), ytre diameter, tykkelse, lengde — med eller uten overskriftsrad. genererer stående (vertikale) rør, rødbrun standardfarge.
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="field">
+      <label>koordinatsystem (IFC-georeferanse)</label>
+      <input type="text" id="crsName" value="NTM10" placeholder="f.eks. NTM10, EPSG:5110">
+    </div>
+    <div class="field">
+      <label>geodetisk datum</label>
+      <input type="text" id="crsDatum" value="EUREF89">
+    </div>
+    <div class="field">
+      <label>origo i koordinatsystemet (Øst / Nord / Kote)</label>
+      <div class="row">
+        <input type="number" id="crsE" value="0" step="0.01">
+        <input type="number" id="crsN" value="0" step="0.01">
+        <input type="number" id="crsH" value="0" step="0.01">
+      </div>
+    </div>
+    <div class="field">
+      <label>rotasjon (grader fra nord)</label>
+      <input type="number" id="crsRot" value="0" step="0.1">
+    </div>
+    <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: -4px; line-height: 1.5;">
+      origo fylles automatisk ut fra første fil-import (tyngdepunkt av rørene). objektposisjoner lagres lokalt relativt til origo — offset skrives til IFC via IfcMapConversion.
+    </div>
+
+    <hr>
+
+    <div class="field">
+      <label>type</label>
+      <select id="type">
+        <option value="box">boks (L × B × H)</option>
+        <option value="cylinder">sylinder (r, h)</option>
+        <option value="cone">kjegle (r, h)</option>
+        <option value="sphere">kule (r)</option>
+        <option value="tube">rør (r-ytre, r-indre, h)</option>
+      </select>
+    </div>
+
+    <div id="params"></div>
+
+    <div class="field">
+      <label>posisjon (x, y, z)</label>
+      <div class="row">
+        <input type="number" id="px" value="0" step="0.1">
+        <input type="number" id="py" value="0" step="0.1">
+        <input type="number" id="pz" value="0" step="0.1">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>farge</label>
+      <input type="text" id="color" value="#4fb0ae">
+    </div>
+
+    <hr>
+
+    <div class="field">
+      <label>navn (valgfritt)</label>
+      <input type="text" id="objName" placeholder="f.eks. Fundament-1">
+    </div>
+
+    <div class="field">
+      <label>IFC-type</label>
+      <select id="ifcType">
+        <option value="IFCBUILDINGELEMENTPROXY">Generisk (Proxy)</option>
+        <option value="IFCWALL">Vegg</option>
+        <option value="IFCCOLUMN">Søyle</option>
+        <option value="IFCBEAM">Bjelke</option>
+        <option value="IFCSLAB">Dekke / plate</option>
+        <option value="IFCFOOTING">Fundament</option>
+        <option value="IFCPILE">Pæl</option>
+        <option value="IFCPIPESEGMENT">Rør</option>
+        <option value="IFCCOVERING">Kledning / belegg</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>egenskaper (Pset_Egenskaper)</label>
+      <div id="propRows"></div>
+      <button id="addPropRow" type="button" style="width:100%; margin-top:4px;">+ egenskap</button>
+    </div>
+
+    <button id="addBtn">+ legg til objekt</button>
+
+    <hr>
+    <label style="font-family: var(--mono); font-size: 11px; color: var(--text-dim);">objekter i scenen</label>
+    <div id="details"></div>
+    <div id="objList" style="margin-top:8px;"></div>
+
+    <div id="exportRow">
+      <button id="exportBtn">eksporter STL</button>
+      <button id="exportIfcBtn">eksporter IFC</button>
+    </div>
+    <div id="exportRow">
+      <button id="clearBtn">tøm scene</button>
+    </div>
+  </div>
+
+  <div id="canvasWrap">
+    <div id="hud">klikk: velg objekt · dra: roter · scroll: zoom · shift+dra: pan · <b id="countHud">0</b> objekt(er)</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+<script>
+  // Sjekk at bibliotekene faktisk lastet, og gi tydelig feilmelding i UI hvis ikke
+  window.addEventListener('load', () => {
+    if (typeof THREE === 'undefined' || !THREE.OrbitControls || !THREE.STLExporter) {
+      document.getElementById('params').innerHTML =
+        '<div style="color:#d9645f; font-family:var(--mono); font-size:11.5px;">Kunne ikke laste Three.js-biblioteker (sjekk nettforbindelse / evt. adblocker som blokkerer jsdelivr).</div>';
+    }
+  });
+</script>
+<script>
+const wrap = document.getElementById('canvasWrap');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e1113);
+
+const camera = new THREE.PerspectiveCamera(45, wrap.clientWidth/wrap.clientHeight, 0.1, 1000);
+camera.position.set(6, 5, 8);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+wrap.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x222222, 1.1));
+const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+dir.position.set(5, 10, 7);
+scene.add(dir);
+
+const grid = new THREE.GridHelper(20, 20, 0x2a3034, 0x1d2226);
+scene.add(grid);
+const axes = new THREE.AxesHelper(2);
+scene.add(axes);
+
+window.addEventListener('resize', () => {
+  camera.aspect = wrap.clientWidth / wrap.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+});
+
+let selectedId = null;
+let selectionHelper = null;
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  if (selectionHelper) selectionHelper.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// --- Objektseleksjon (klikk i scenen eller i listen) ---
+const ifcTypeLabels = {
+  IFCBUILDINGELEMENTPROXY: 'Generisk (Proxy)', IFCWALL: 'Vegg', IFCCOLUMN: 'Søyle',
+  IFCBEAM: 'Bjelke', IFCSLAB: 'Dekke / plate', IFCFOOTING: 'Fundament',
+  IFCPILE: 'Pæl', IFCPIPESEGMENT: 'Rør', IFCCOVERING: 'Kledning / belegg',
+};
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function selectObject(id) {
+  selectedId = id;
+  if (selectionHelper) {
+    scene.remove(selectionHelper);
+    selectionHelper.geometry.dispose();
+    selectionHelper.material.dispose();
+    selectionHelper = null;
+  }
+  const o = objects.find(o => o.id === id);
+  if (o) {
+    selectionHelper = new THREE.BoxHelper(o.mesh, 0xe8a33d);
+    scene.add(selectionHelper);
+  }
+  renderDetails();
+  renderList();
+}
+
+function renderDetails() {
+  const el = document.getElementById('details');
+  const o = objects.find(o => o.id === selectedId);
+  if (!o) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'block';
+  const dims = Object.entries(o.params).filter(([k]) => k !== 'seg')
+    .map(([k,v]) => `<div class="meta-row"><span>${k}</span><span>${v}</span></div>`).join('');
+  const propsHtml = o.props.length
+    ? o.props.map(pr => `<div class="meta-row"><span>${escHtml(pr.k)}</span><span>${escHtml(pr.v)}</span></div>`).join('')
+    : '<div style="color:var(--text-dim); font-size:11px;">ingen egenskaper</div>';
+  el.innerHTML = `
+    <div class="details-head">
+      <div class="details-title">${escHtml(o.name || (o.type + '_' + o.id))}</div>
+      <span class="del" onclick="removeObject(${o.id})" style="cursor:pointer; color:var(--text-dim);">✕</span>
+    </div>
+    <div class="meta-row"><span>type</span><span>${o.type}</span></div>
+    <div class="meta-row"><span>ifc-type</span><span>${ifcTypeLabels[o.ifcType] || o.ifcType}</span></div>
+    ${dims}
+    <div class="meta-row"><span>posisjon</span><span>${o.mesh.position.x.toFixed(2)}, ${o.mesh.position.y.toFixed(2)}, ${o.mesh.position.z.toFixed(2)}</span></div>
+    <hr style="border-color: var(--line); margin:8px 0;">
+    <div style="font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-bottom:4px;">EGENSKAPER</div>
+    ${propsHtml}
+  `;
+}
+
+let pointerDownPos = null;
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  pointerDownPos = { x: e.clientX, y: e.clientY };
+});
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!pointerDownPos) return;
+  const moved = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+  pointerDownPos = null;
+  if (moved > 4) return; // var en dra-bevegelse (orbit), ikke et klikk
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(objects.map(o => o.mesh), false);
+  selectObject(hits.length > 0 ? hits[0].object.userData.id : null);
+});
+
+// --- Parametrisk input ---
+const paramDefs = {
+  box:      [{k:'l',l:'lengde (X)',v:2}, {k:'b',l:'bredde (Y)',v:1}, {k:'h',l:'høyde (Z)',v:1}],
+  cylinder: [{k:'r',l:'radius',v:1}, {k:'h',l:'høyde',v:2}, {k:'seg',l:'segmenter',v:32}],
+  cone:     [{k:'r',l:'radius (base)',v:1}, {k:'h',l:'høyde',v:2}, {k:'seg',l:'segmenter',v:32}],
+  sphere:   [{k:'r',l:'radius',v:1}, {k:'seg',l:'segmenter',v:32}],
+  tube:     [{k:'ro',l:'radius ytre',v:1}, {k:'ri',l:'radius indre',v:0.6}, {k:'h',l:'høyde',v:1.5}, {k:'seg',l:'segmenter',v:32}],
+};
+
+const typeSel = document.getElementById('type');
+const paramsDiv = document.getElementById('params');
+
+function renderParams() {
+  const defs = paramDefs[typeSel.value];
+  paramsDiv.innerHTML = defs.map(d => `
+    <div class="field">
+      <label>${d.l}</label>
+      <input type="number" id="p_${d.k}" value="${d.v}" step="0.1">
+    </div>`).join('');
+}
+typeSel.addEventListener('change', renderParams);
+renderParams();
+
+// --- Egenskaper (Pset) — utkast før objekt legges til ---
+let draftProps = [];
+
+function renderPropRows() {
+  const c = document.getElementById('propRows');
+  if (draftProps.length === 0) { c.innerHTML = ''; return; }
+  c.innerHTML = draftProps.map((pr, i) => `
+    <div class="prop-row">
+      <input type="text" value="${pr.k.replace(/"/g,'&quot;')}" placeholder="navn" data-i="${i}" data-f="k" class="propInput">
+      <input type="text" value="${pr.v.replace(/"/g,'&quot;')}" placeholder="verdi" data-i="${i}" data-f="v" class="propInput">
+      <span class="del" data-del="${i}">✕</span>
+    </div>`).join('');
+  c.querySelectorAll('.propInput').forEach(inp => {
+    inp.addEventListener('input', e => {
+      draftProps[+e.target.dataset.i][e.target.dataset.f] = e.target.value;
+    });
+  });
+  c.querySelectorAll('[data-del]').forEach(el => {
+    el.addEventListener('click', e => {
+      draftProps.splice(+e.target.dataset.del, 1);
+      renderPropRows();
+    });
+  });
+}
+document.getElementById('addPropRow').addEventListener('click', () => {
+  draftProps.push({ k: '', v: '' });
+  renderPropRows();
+});
+
+// --- Objektstyring ---
+let objects = []; // {id, mesh, type, params}
+let idCounter = 1;
+
+function getParamVals() {
+  const defs = paramDefs[typeSel.value];
+  const vals = {};
+  defs.forEach(d => vals[d.k] = parseFloat(document.getElementById('p_'+d.k).value));
+  return vals;
+}
+
+function buildGeometry(type, p) {
+  switch(type) {
+    case 'box': return new THREE.BoxGeometry(p.l, p.h, p.b); // Y=høyde i three.js
+    case 'cylinder': return new THREE.CylinderGeometry(p.r, p.r, p.h, Math.max(3, Math.round(p.seg)));
+    case 'cone': return new THREE.ConeGeometry(p.r, p.h, Math.max(3, Math.round(p.seg)));
+    case 'sphere': return new THREE.SphereGeometry(p.r, Math.max(3, Math.round(p.seg)), Math.max(3, Math.round(p.seg)));
+    case 'tube': {
+      const shape = new THREE.Shape();
+      shape.absarc(0, 0, p.ro, 0, Math.PI*2, false);
+      const hole = new THREE.Path();
+      hole.absarc(0, 0, p.ri, 0, Math.PI*2, true);
+      shape.holes.push(hole);
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: p.h, bevelEnabled: false, curveSegments: Math.max(3, Math.round(p.seg)) });
+      geo.rotateX(-Math.PI/2);
+      return geo;
+    }
+  }
+}
+
+function addObject() {
+  const type = typeSel.value;
+  const p = getParamVals();
+  const geo = buildGeometry(type, p);
+  const color = document.getElementById('color').value || '#4fb0ae';
+  const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), metalness: 0.15, roughness: 0.55 });
+  const mesh = new THREE.Mesh(geo, mat);
+
+  const px = parseFloat(document.getElementById('px').value) || 0;
+  const py = parseFloat(document.getElementById('py').value) || 0;
+  const pz = parseFloat(document.getElementById('pz').value) || 0;
+  mesh.position.set(px, py, pz);
+
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
+  mesh.add(edges);
+
+  scene.add(mesh);
+
+  const id = idCounter++;
+  mesh.userData.id = id;
+  const name = (document.getElementById('objName').value || '').trim();
+  const ifcType = document.getElementById('ifcType').value;
+  const props = draftProps.filter(pr => pr.k.trim() !== '');
+
+  objects.push({ id, mesh, type, params: p, name, ifcType, props });
+  renderList();
+
+  // nullstill utkast til neste objekt
+  document.getElementById('objName').value = '';
+  draftProps = [];
+  renderPropRows();
+}
+
+// --- Import av vertikale rør fra fil (txt/csv/xlsx) ---
+const PIPE_COLOR = '#A0522D'; // rødbrun
+
+const COLUMN_ALIASES = {
+  x: ['x', 'øst', 'east', 'easting'],
+  y: ['y', 'nord', 'north', 'northing'],
+  z: ['z', 'kote', 'elevation', 'høyde', 'hoyde'],
+  od: ['ytre diameter', 'ytre_diameter', 'ytterdiameter', 'diameter', 'od', 'dy'],
+  t:  ['tykkelse', 'godstykkelse', 'thickness'],
+  l:  ['lengde', 'length'],
+};
+
+function matchColumn(header) {
+  const h = String(header).trim().toLowerCase();
+  for (const [key, aliases] of Object.entries(COLUMN_ALIASES)) {
+    if (aliases.includes(h)) return key;
+  }
+  for (const [key, aliases] of Object.entries(COLUMN_ALIASES)) {
+    if (aliases.some(a => a.length >= 4 && h.includes(a))) return key;
+  }
+  return null;
+}
+
+function countChar(s, ch) { return s.split(ch).length - 1; }
+
+async function readFileAsRows(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'xlsx' || ext === 'xls') {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+  }
+  const text = await file.text();
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+  if (lines.length === 0) return [];
+  const delims = [',', ';', '\t'];
+  const counts = delims.map(d => countChar(lines[0], d));
+  const delim = counts.every(c => c === 0) ? ',' : delims[counts.indexOf(Math.max(...counts))];
+  const decimalComma = delim === ';'; // vanlig ved norsk Excel-eksport
+  return lines.map(line => line.split(delim).map(c => {
+    const v = c.trim();
+    return decimalComma ? v : v;
+  }));
+}
+
+function rowsToPipes(rows, decimalComma) {
+  const errors = [];
+  if (rows.length === 0) return { pipes: [], errors: ['Tom fil'] };
+
+  const num = (v) => {
+    if (v === undefined || v === null || v === '') return NaN;
+    if (typeof v === 'number') return v;
+    return parseFloat(String(v).replace(',', '.'));
+  };
+
+  const headerCandidate = rows[0].map(matchColumn);
+  let colMap, dataRows;
+  if (headerCandidate.some(c => c !== null)) {
+    colMap = {};
+    headerCandidate.forEach((key, i) => { if (key) colMap[key] = i; });
+    dataRows = rows.slice(1);
+  } else {
+    const n = rows[0].length;
+    colMap = n >= 6
+      ? { x: 0, y: 1, z: 2, od: 3, t: 4, l: 5 }
+      : { x: 0, y: 1, od: 2, t: 3, l: 4 };
+    dataRows = rows;
+  }
+
+  if (colMap.x === undefined || colMap.y === undefined || colMap.od === undefined ||
+      colMap.t === undefined || colMap.l === undefined) {
+    return { pipes: [], errors: ['Fant ikke nødvendige kolonner (X, Y, ytre diameter, tykkelse, lengde)'] };
+  }
+
+  const pipes = [];
+  dataRows.forEach((row, i) => {
+    if (!row || row.every(c => c === '' || c === undefined || c === null)) return;
+    const x = num(row[colMap.x]);
+    const y = num(row[colMap.y]);
+    const z = colMap.z !== undefined ? num(row[colMap.z]) : 0;
+    const od = num(row[colMap.od]);
+    const t = num(row[colMap.t]);
+    const l = num(row[colMap.l]);
+    if ([x, y, od, t, l].some(v => isNaN(v)) || od <= 0 || l <= 0 || t <= 0 || t >= od / 2) {
+      errors.push(`Rad ${i + 1}: ugyldige verdier, hoppet over`);
+      return;
+    }
+    pipes.push({ x, y, z: isNaN(z) ? 0 : z, od, t, l });
+  });
+  return { pipes, errors };
+}
+
+// --- Verdenskoordinater / georeferanse ---
+let worldOrigin = { e: 0, n: 0, h: 0 };
+let originAutoSet = true;
+
+function readOriginFields() {
+  worldOrigin.e = parseFloat(document.getElementById('crsE').value) || 0;
+  worldOrigin.n = parseFloat(document.getElementById('crsN').value) || 0;
+  worldOrigin.h = parseFloat(document.getElementById('crsH').value) || 0;
+}
+['crsE', 'crsN', 'crsH'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    originAutoSet = false;
+    readOriginFields();
+  });
+});
+
+function addPipeFromData(data, i) {
+  const { x, y, z, od, t, l } = data;
+  const ro = od / 2, ri = ro - t;
+  const geo = buildGeometry('tube', { ro, ri, h: l, seg: 32 });
+  const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(PIPE_COLOR), metalness: 0.15, roughness: 0.55 });
+  const mesh = new THREE.Mesh(geo, mat);
+  // Lokal posisjon = verdenskoordinat minus modellorigo (holder scenen nær 0,0,0)
+  mesh.position.set(x - worldOrigin.e, z - worldOrigin.h, y - worldOrigin.n);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
+  mesh.add(edges);
+  scene.add(mesh);
+
+  const id = idCounter++;
+  mesh.userData.id = id;
+  objects.push({
+    id, mesh, type: 'tube', params: { ro: +ro.toFixed(4), ri: +ri.toFixed(4), h: l },
+    name: `Rør_${i + 1}`,
+    ifcType: 'IFCPIPESEGMENT',
+    props: [
+      { k: 'X', v: String(x) }, { k: 'Y', v: String(y) }, { k: 'Z/kote', v: String(z) },
+      { k: 'Ytre diameter', v: String(od) }, { k: 'Tykkelse', v: String(t) },
+    ],
+  });
+}
+
+function fitViewToObjects() {
+  if (objects.length === 0) return;
+  const box = new THREE.Box3();
+  objects.forEach(o => box.expandByObject(o.mesh));
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, 1);
+  controls.target.copy(center);
+  camera.position.set(center.x + maxDim, center.y + maxDim * 0.8, center.z + maxDim);
+  controls.update();
+}
+
+document.getElementById('pipeFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  const statusEl = document.getElementById('importStatus');
+  if (!file) return;
+  statusEl.style.color = 'var(--text-dim)';
+  statusEl.textContent = 'Leser fil...';
+  try {
+    const rows = await readFileAsRows(file);
+    const { pipes, errors } = rowsToPipes(rows);
+
+    if (originAutoSet && pipes.length > 0 && objects.length === 0) {
+      const avgE = pipes.reduce((s, p) => s + p.x, 0) / pipes.length;
+      const avgN = pipes.reduce((s, p) => s + p.y, 0) / pipes.length;
+      const avgH = pipes.reduce((s, p) => s + p.z, 0) / pipes.length;
+      worldOrigin = { e: avgE, n: avgN, h: avgH };
+      document.getElementById('crsE').value = avgE.toFixed(3);
+      document.getElementById('crsN').value = avgN.toFixed(3);
+      document.getElementById('crsH').value = avgH.toFixed(3);
+    }
+
+    pipes.forEach((p, i) => addPipeFromData(p, objects.length + i));
+    renderList();
+    let msg = `${pipes.length} rør importert`;
+    if (errors.length) msg += ` · ${errors.length} rad(er) hoppet over`;
+    statusEl.textContent = msg;
+    statusEl.style.color = pipes.length > 0 ? 'var(--accent)' : '#d9645f';
+    if (pipes.length > 0) fitViewToObjects();
+  } catch (err) {
+    statusEl.textContent = 'Kunne ikke lese filen: ' + err.message;
+    statusEl.style.color = '#d9645f';
+  }
+  e.target.value = '';
+});
+
+function removeObject(id) {
+  const idx = objects.findIndex(o => o.id === id);
+  if (idx === -1) return;
+  scene.remove(objects[idx].mesh);
+  objects[idx].mesh.geometry.dispose();
+  objects[idx].mesh.material.dispose();
+  objects.splice(idx, 1);
+  if (selectedId === id) selectObject(null);
+  renderList();
+}
+
+function renderList() {
+  const list = document.getElementById('objList');
+  document.getElementById('countHud').textContent = objects.length;
+  if (objects.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-dim); font-family:var(--mono); font-size:11.5px;">— ingen objekter enda —</div>';
+    return;
+  }
+  list.innerHTML = objects.map(o => {
+    const p = o.params;
+    const dims = Object.entries(p).filter(([k]) => k !== 'seg').map(([k,v]) => `${k}=${v}`).join(' ');
+    const label = o.name ? escHtml(o.name) : `#${o.id} ${o.type}`;
+    const propInfo = o.props.length ? ` · ${o.props.length} egenskap(er)` : '';
+    const selCls = o.id === selectedId ? ' selected' : '';
+    return `<div class="obj-item${selCls}">
+      <div>
+        <div class="name" onclick="selectObject(${o.id})" style="cursor:pointer;">${label}</div>
+        <div class="meta">${dims}${propInfo}</div>
+      </div>
+      <div class="del" onclick="removeObject(${o.id})">✕</div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('addBtn').addEventListener('click', addObject);
+document.getElementById('clearBtn').addEventListener('click', () => {
+  [...objects].forEach(o => removeObject(o.id));
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (objects.length === 0) return;
+  const exporter = new THREE.STLExporter();
+  const exportScene = new THREE.Scene();
+  objects.forEach(o => exportScene.add(o.mesh.clone()));
+  const stlString = exporter.parse(exportScene);
+  const blob = new Blob([stlString], { type: 'text/plain' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'modell.stl';
+  link.click();
+});
+
+window.removeObject = removeObject;
+window.selectObject = selectObject;
+
+// --- IFC4-eksport (minimal, hånd-generert STEP/SPF) ---
+function ifcGuid() {
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
+  let s = '';
+  for (let i = 0; i < 22; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+function escStr(s) { return String(s).replace(/'/g, "''"); }
+
+function ifcValueWrap(val) {
+  const trimmed = String(val).trim();
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return `IFCREAL(${parseFloat(trimmed)})`;
+  return `IFCLABEL('${escStr(val)}')`;
+}
+
+function exportIFC() {
+  if (objects.length === 0) return;
+  let n = 0;
+  const lines = [];
+  const E = (def) => { n++; lines.push(`#${n}=${def};`); return n; };
+
+  const person = E(`IFCPERSON($,$,'',$,$,$,$,$)`);
+  const org = E(`IFCORGANIZATION($,'Parametrisk3D',$,$,$)`);
+  const perOrg = E(`IFCPERSONANDORGANIZATION(#${person},#${org},$)`);
+  const app = E(`IFCAPPLICATION(#${org},'1.0','Parametrisk 3D Tool','P3D')`);
+  const owner = E(`IFCOWNERHISTORY(#${perOrg},#${app},$,.ADDED.,$,$,$,0)`);
+  const F = (v) => v.toFixed(4);
+  const lenUnit = E(`IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.)`);
+  const angUnit = E(`IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.)`);
+  const solidAngUnit = E(`IFCSIUNIT(*,.SOLIDANGLEUNIT.,$,.STERADIAN.)`);
+  const units = E(`IFCUNITASSIGNMENT((#${lenUnit},#${angUnit},#${solidAngUnit}))`);
+  const origin = E(`IFCCARTESIANPOINT((0.,0.,0.))`);
+  const worldAx = E(`IFCAXIS2PLACEMENT3D(#${origin},$,$)`);
+  const ctx = E(`IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.0E-5,#${worldAx},$)`);
+
+  // Georeferanse: knytter modellens lokale origo (0,0,0) til en verdenskoordinat i et navngitt CRS
+  const crsName = document.getElementById('crsName').value.trim() || 'NTM10';
+  const crsDatum = document.getElementById('crsDatum').value.trim() || 'EUREF89';
+  const rotDeg = parseFloat(document.getElementById('crsRot').value) || 0;
+  const rotRad = rotDeg * Math.PI / 180;
+  const projectedCrs = E(`IFCPROJECTEDCRS('${escStr(crsName)}',$,'${escStr(crsDatum)}',$,$,$,#${lenUnit})`);
+  E(`IFCMAPCONVERSION(#${ctx},#${projectedCrs},${F(worldOrigin.e)},${F(worldOrigin.n)},${F(worldOrigin.h)},${F(Math.cos(rotRad))},${F(Math.sin(rotRad))},1.)`);
+
+  const project = E(`IFCPROJECT('${ifcGuid()}',#${owner},'Parametrisk3DProsjekt',$,$,$,$,(#${ctx}),#${units})`);
+
+  const sitePl = E(`IFCLOCALPLACEMENT($,#${worldAx})`);
+  const site = E(`IFCSITE('${ifcGuid()}',#${owner},'Site',$,$,#${sitePl},$,$,.ELEMENT.,$,$,$,$,$)`);
+  const buildPl = E(`IFCLOCALPLACEMENT(#${sitePl},#${worldAx})`);
+  const building = E(`IFCBUILDING('${ifcGuid()}',#${owner},'Building',$,$,#${buildPl},$,$,.ELEMENT.,$,$,$)`);
+  const storeyPl = E(`IFCLOCALPLACEMENT(#${buildPl},#${worldAx})`);
+  const storey = E(`IFCBUILDINGSTOREY('${ifcGuid()}',#${owner},'Storey',$,$,#${storeyPl},$,$,.ELEMENT.,0.)`);
+
+  E(`IFCRELAGGREGATES('${ifcGuid()}',#${owner},$,$,#${project},(#${site}))`);
+  E(`IFCRELAGGREGATES('${ifcGuid()}',#${owner},$,$,#${site},(#${building}))`);
+  E(`IFCRELAGGREGATES('${ifcGuid()}',#${owner},$,$,#${building},(#${storey}))`);
+
+  const proxyIds = [];
+
+  objects.forEach(o => {
+    const p = o.params;
+    const pos = o.mesh.position;
+    // Konverter Three.js (Y opp) -> IFC (Z opp): X=x, Y=-z, Z=y
+    const ix = pos.x, iy = -pos.z, iz = pos.y;
+    let geomId, repType = 'CSG';
+
+    if (o.type === 'box') {
+      const { l, b, h } = p;
+      const lo = E(`IFCCARTESIANPOINT((${F(-l/2)},${F(-b/2)},${F(-h/2)}))`);
+      const lax = E(`IFCAXIS2PLACEMENT3D(#${lo},$,$)`);
+      const block = E(`IFCBLOCK(#${lax},${F(l)},${F(b)},${F(h)})`);
+      geomId = E(`IFCCSGSOLID(#${block})`);
+    } else if (o.type === 'cylinder') {
+      const { r, h } = p;
+      const lo = E(`IFCCARTESIANPOINT((0.,0.,${F(-h/2)}))`);
+      const lax = E(`IFCAXIS2PLACEMENT3D(#${lo},$,$)`);
+      const cyl = E(`IFCRIGHTCIRCULARCYLINDER(#${lax},${F(h)},${F(r)})`);
+      geomId = E(`IFCCSGSOLID(#${cyl})`);
+    } else if (o.type === 'cone') {
+      const { r, h } = p;
+      const lo = E(`IFCCARTESIANPOINT((0.,0.,${F(-h/2)}))`);
+      const lax = E(`IFCAXIS2PLACEMENT3D(#${lo},$,$)`);
+      const cone = E(`IFCRIGHTCIRCULARCONE(#${lax},${F(h)},${F(r)})`);
+      geomId = E(`IFCCSGSOLID(#${cone})`);
+    } else if (o.type === 'sphere') {
+      const { r } = p;
+      const lax = E(`IFCAXIS2PLACEMENT3D(#${origin},$,$)`);
+      const sph = E(`IFCSPHERE(#${lax},${F(r)})`);
+      geomId = E(`IFCCSGSOLID(#${sph})`);
+    } else if (o.type === 'tube') {
+      repType = 'SweptSolid';
+      const { ro, ri, h } = p;
+      const profOrigin = E(`IFCCARTESIANPOINT((0.,0.))`);
+      const profAx = E(`IFCAXIS2PLACEMENT2D(#${profOrigin},$)`);
+      const profile = E(`IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,$,#${profAx},${F(ro)},${F(ro - ri)})`);
+      const extrudeAx = E(`IFCAXIS2PLACEMENT3D(#${origin},$,$)`);
+      const dir = E(`IFCDIRECTION((0.,0.,1.))`);
+      geomId = E(`IFCEXTRUDEDAREASOLID(#${profile},#${extrudeAx},#${dir},${F(h)})`);
+    }
+
+    const shapeRep = E(`IFCSHAPEREPRESENTATION(#${ctx},'Body','${repType}',(#${geomId}))`);
+    const prodShape = E(`IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRep}))`);
+    const objOrigin = E(`IFCCARTESIANPOINT((${F(ix)},${F(iy)},${F(iz)}))`);
+    const objAx = E(`IFCAXIS2PLACEMENT3D(#${objOrigin},$,$)`);
+    const objPlacement = E(`IFCLOCALPLACEMENT(#${storeyPl},#${objAx})`);
+    const elemName = o.name ? escStr(o.name) : `${o.type}_${o.id}`;
+    const proxy = E(`${o.ifcType}('${ifcGuid()}',#${owner},'${elemName}',$,$,#${objPlacement},#${prodShape},$,$)`);
+    proxyIds.push(proxy);
+
+    if (o.props.length > 0) {
+      const propValueIds = o.props.map(pr =>
+        E(`IFCPROPERTYSINGLEVALUE('${escStr(pr.k)}',$,${ifcValueWrap(pr.v)},$)`)
+      );
+      const pset = E(`IFCPROPERTYSET('${ifcGuid()}',#${owner},'Pset_Egenskaper',$,(${propValueIds.map(i => '#' + i).join(',')}))`);
+      E(`IFCRELDEFINESBYPROPERTIES('${ifcGuid()}',#${owner},$,$,(#${proxy}),#${pset})`);
+    }
+  });
+
+  E(`IFCRELCONTAINEDINSPATIALSTRUCTURE('${ifcGuid()}',#${owner},$,$,(${proxyIds.map(i => '#' + i).join(',')}),#${storey})`);
+
+  const header = `ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION((''),'2;1');
+FILE_NAME('modell.ifc','${new Date().toISOString()}',(''),(''),'Parametrisk 3D Tool','','');
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+`;
+  const footer = `ENDSEC;
+END-ISO-10303-21;
+`;
+
+  const content = header + lines.join('\n') + '\n' + footer;
+  const blob = new Blob([content], { type: 'text/plain' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'modell.ifc';
+  link.click();
+}
+
+document.getElementById('exportIfcBtn').addEventListener('click', exportIFC);
+
+// start med ett eksempel-objekt
+addObject();
+</script>
+</body>
+</html>
