@@ -114,8 +114,36 @@
       <input type="file" id="pipeFile" accept=".txt,.csv,.xlsx,.xls">
       <div id="importStatus" style="font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); margin-top: 5px;"></div>
       <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 6px; line-height: 1.5;">
-        kolonner: X, Y, (Z/kote), ytre diameter, tykkelse, lengde — med eller uten overskriftsrad. genererer stående (vertikale) rør, rødbrun standardfarge.
+        genererer stående (vertikale) rør, rødbrun standardfarge. resten av kolonnene blir egenskaper på hvert rør.
       </div>
+    </div>
+
+    <div class="field">
+      <label>kolonnebokstaver (Excel) — la stå tomt for auto-gjenkjenning</label>
+      <div class="row" style="margin-bottom:6px;">
+        <input type="text" id="colOD" placeholder="OD" title="Ytre diameter" value="C">
+        <input type="text" id="colT" placeholder="Tykk." title="Tykkelse" value="D">
+        <input type="text" id="colZ" placeholder="Kote" title="Kote topp (Z)" value="E">
+      </div>
+      <div class="row">
+        <input type="text" id="colNorth" placeholder="Nord" title="Nord-koordinat" value="F">
+        <input type="text" id="colEast" placeholder="Øst" title="Øst-koordinat" value="G">
+        <input type="text" id="colL" placeholder="Lengde" title="Total lengde" value="H">
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <input type="text" id="colBerg" placeholder="Berg" title="Lengde i berg" value="I">
+        <input type="text" id="colLosmasse" placeholder="Løsm." title="Lengde i løsmasser" value="J">
+      </div>
+    </div>
+
+    <div class="field" style="display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="splitSegments" checked style="width:auto;">
+      <label style="margin:0; font-size:11px;">del rør i løsmasse-/bergsegment (ulik farge) når kolonnene over er fylt ut</label>
+    </div>
+
+    <div class="field" style="display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="mmToM" checked style="width:auto;">
+      <label style="margin:0; font-size:11px;">diameter/tykkelse oppgitt i mm (konverteres til meter)</label>
     </div>
 
     <hr>
@@ -135,13 +163,19 @@
         <input type="number" id="crsN" value="0" step="0.01">
         <input type="number" id="crsH" value="0" step="0.01">
       </div>
+      <button id="recenterBtn" type="button" style="width:100%; margin-top:6px;">flytt objekter nær origo (tyngdepunkt)</button>
     </div>
     <div class="field">
       <label>rotasjon (grader fra nord)</label>
       <input type="number" id="crsRot" value="0" step="0.1">
     </div>
     <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: -4px; line-height: 1.5;">
-      origo fylles automatisk ut fra første fil-import (tyngdepunkt av rørene). objektposisjoner lagres lokalt relativt til origo — offset skrives til IFC via IfcMapConversion.
+      origo er 0 som standard — objektene plasseres da direkte på koordinatene fra fila. sett origo manuelt kun hvis du vil forskyve hele modellen nærmere (0,0,0) i 3D-visningen; offset skrives uansett til IFC via IfcMapConversion.
+    </div>
+
+    <div class="field" style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+      <input type="checkbox" id="bakeWorldCoords" style="width:auto;">
+      <label style="margin:0; font-size:11px;">skriv absolutte verdenskoordinater direkte i IFC-plasseringene (i stedet for lokal origo + IfcMapConversion-offset)</label>
     </div>
 
     <hr>
@@ -358,7 +392,7 @@ const paramDefs = {
   cylinder: [{k:'r',l:'radius',v:1}, {k:'h',l:'høyde',v:2}, {k:'seg',l:'segmenter',v:32}],
   cone:     [{k:'r',l:'radius (base)',v:1}, {k:'h',l:'høyde',v:2}, {k:'seg',l:'segmenter',v:32}],
   sphere:   [{k:'r',l:'radius',v:1}, {k:'seg',l:'segmenter',v:32}],
-  tube:     [{k:'ro',l:'radius ytre',v:1}, {k:'ri',l:'radius indre',v:0.6}, {k:'h',l:'høyde',v:1.5}, {k:'seg',l:'segmenter',v:32}],
+  tube:     [{k:'od',l:'ytre diameter',v:2}, {k:'t',l:'tykkelse',v:0.2}, {k:'h',l:'høyde',v:1.5}, {k:'seg',l:'segmenter',v:32}],
 };
 
 const typeSel = document.getElementById('type');
@@ -422,13 +456,15 @@ function buildGeometry(type, p) {
     case 'cone': return new THREE.ConeGeometry(p.r, p.h, Math.max(3, Math.round(p.seg)));
     case 'sphere': return new THREE.SphereGeometry(p.r, Math.max(3, Math.round(p.seg)), Math.max(3, Math.round(p.seg)));
     case 'tube': {
+      const ro = p.od / 2, ri = ro - p.t;
       const shape = new THREE.Shape();
-      shape.absarc(0, 0, p.ro, 0, Math.PI*2, false);
+      shape.absarc(0, 0, ro, 0, Math.PI*2, false);
       const hole = new THREE.Path();
-      hole.absarc(0, 0, p.ri, 0, Math.PI*2, true);
+      hole.absarc(0, 0, ri, 0, Math.PI*2, true);
       shape.holes.push(hole);
       const geo = new THREE.ExtrudeGeometry(shape, { depth: p.h, bevelEnabled: false, curveSegments: Math.max(3, Math.round(p.seg)) });
       geo.rotateX(-Math.PI/2);
+      geo.translate(0, -p.h, 0); // origo = topp av røret, geometrien strekker seg nedover
       return geo;
     }
   }
@@ -458,7 +494,7 @@ function addObject() {
   const ifcType = document.getElementById('ifcType').value;
   const props = draftProps.filter(pr => pr.k.trim() !== '');
 
-  objects.push({ id, mesh, type, params: p, name, ifcType, props });
+  objects.push({ id, mesh, type, params: p, name, ifcType, props, color });
   renderList();
 
   // nullstill utkast til neste objekt
@@ -498,7 +534,7 @@ async function readFileAsRows(file) {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array' });
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+    return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '', cellDates: true });
   }
   const text = await file.text();
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
@@ -513,7 +549,20 @@ async function readFileAsRows(file) {
   }));
 }
 
-function rowsToPipes(rows, decimalComma) {
+function colLetterToIndex(letter) {
+  letter = String(letter).trim().toUpperCase();
+  if (!letter) return undefined;
+  let idx = 0;
+  for (let i = 0; i < letter.length; i++) idx = idx * 26 + (letter.charCodeAt(i) - 64);
+  return idx - 1;
+}
+
+function formatCellValue(v) {
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return String(v);
+}
+
+function rowsToPipes(rows) {
   const errors = [];
   if (rows.length === 0) return { pipes: [], errors: ['Tom fil'] };
 
@@ -523,24 +572,50 @@ function rowsToPipes(rows, decimalComma) {
     return parseFloat(String(v).replace(',', '.'));
   };
 
-  const headerCandidate = rows[0].map(matchColumn);
-  let colMap, dataRows;
-  if (headerCandidate.some(c => c !== null)) {
-    colMap = {};
-    headerCandidate.forEach((key, i) => { if (key) colMap[key] = i; });
+  const letterFields = {
+    x: document.getElementById('colEast').value,
+    y: document.getElementById('colNorth').value,
+    z: document.getElementById('colZ').value,
+    od: document.getElementById('colOD').value,
+    t: document.getElementById('colT').value,
+    l: document.getElementById('colL').value,
+    berg: document.getElementById('colBerg').value,
+    losmasse: document.getElementById('colLosmasse').value,
+  };
+  const useExplicit = Object.values(letterFields).some(v => v.trim() !== '');
+  const mmToM = document.getElementById('mmToM').checked;
+
+  let colMap = {}, headerRow = null, dataRows;
+
+  if (useExplicit) {
+    Object.entries(letterFields).forEach(([key, letter]) => {
+      const idx = colLetterToIndex(letter);
+      if (idx !== undefined) colMap[key] = idx;
+    });
+    headerRow = rows[0]; // antar overskriftsrad når kolonnebokstaver oppgis eksplisitt
     dataRows = rows.slice(1);
   } else {
-    const n = rows[0].length;
-    colMap = n >= 6
-      ? { x: 0, y: 1, z: 2, od: 3, t: 4, l: 5 }
-      : { x: 0, y: 1, od: 2, t: 3, l: 4 };
-    dataRows = rows;
+    const headerCandidate = rows[0].map(matchColumn);
+    if (headerCandidate.some(c => c !== null)) {
+      headerCandidate.forEach((key, i) => { if (key) colMap[key] = i; });
+      headerRow = rows[0];
+      dataRows = rows.slice(1);
+    } else {
+      const n = rows[0].length;
+      colMap = n >= 6 ? { x: 0, y: 1, z: 2, od: 3, t: 4, l: 5 } : { x: 0, y: 1, od: 2, t: 3, l: 4 };
+      dataRows = rows;
+    }
   }
 
   if (colMap.x === undefined || colMap.y === undefined || colMap.od === undefined ||
       colMap.t === undefined || colMap.l === undefined) {
-    return { pipes: [], errors: ['Fant ikke nødvendige kolonner (X, Y, ytre diameter, tykkelse, lengde)'] };
+    return { pipes: [], errors: ['Fant ikke nødvendige kolonner (Øst, Nord, ytre diameter, tykkelse, lengde)'] };
   }
+
+  const usedCols = new Set(Object.values(colMap));
+  const nameColIdx = headerRow
+    ? headerRow.findIndex((h, i) => !usedCols.has(i) && h && /\bid\b|navn|name|element/i.test(String(h)))
+    : -1;
 
   const pipes = [];
   dataRows.forEach((row, i) => {
@@ -548,42 +623,89 @@ function rowsToPipes(rows, decimalComma) {
     const x = num(row[colMap.x]);
     const y = num(row[colMap.y]);
     const z = colMap.z !== undefined ? num(row[colMap.z]) : 0;
-    const od = num(row[colMap.od]);
-    const t = num(row[colMap.t]);
+    let od = num(row[colMap.od]);
+    let t = num(row[colMap.t]);
     const l = num(row[colMap.l]);
-    if ([x, y, od, t, l].some(v => isNaN(v)) || od <= 0 || l <= 0 || t <= 0 || t >= od / 2) {
+    if ([x, y, od, t, l].some(v => isNaN(v)) || od <= 0 || l <= 0 || t <= 0) {
       errors.push(`Rad ${i + 1}: ugyldige verdier, hoppet over`);
       return;
     }
-    pipes.push({ x, y, z: isNaN(z) ? 0 : z, od, t, l });
+    if (mmToM) { od = Math.round(od / 1000 * 1e6) / 1e6; t = Math.round(t / 1000 * 1e6) / 1e6; }
+    if (t >= od / 2) {
+      errors.push(`Rad ${i + 1}: tykkelse ≥ radius, hoppet over`);
+      return;
+    }
+
+    // Berg-/løsmasselengde: bruk oppgitte verdier direkte, evt. utled den ene fra total lengde minus den andre
+    let bergLen = colMap.berg !== undefined ? num(row[colMap.berg]) : NaN;
+    let losmasseLen = colMap.losmasse !== undefined ? num(row[colMap.losmasse]) : NaN;
+    if (isNaN(losmasseLen) && !isNaN(bergLen)) losmasseLen = l - bergLen;
+    if (isNaN(bergLen) && !isNaN(losmasseLen)) bergLen = l - losmasseLen;
+
+    const name = nameColIdx >= 0 && row[nameColIdx] !== '' && row[nameColIdx] != null
+      ? formatCellValue(row[nameColIdx]).trim() : null;
+
+    const props = [];
+    if (headerRow) {
+      headerRow.forEach((h, ci) => {
+        if (usedCols.has(ci)) return;
+        if (!h || String(h).trim() === '') return;
+        const val = row[ci];
+        if (val === undefined || val === null || val === '') return;
+        props.push({ k: String(h).trim(), v: formatCellValue(val) });
+      });
+    }
+
+    pipes.push({ x, y, z: isNaN(z) ? 0 : z, od, t, l, name, extraProps: props, bergLen, losmasseLen });
   });
   return { pipes, errors };
 }
 
 // --- Verdenskoordinater / georeferanse ---
 let worldOrigin = { e: 0, n: 0, h: 0 };
-let originAutoSet = true;
 
-function readOriginFields() {
-  worldOrigin.e = parseFloat(document.getElementById('crsE').value) || 0;
-  worldOrigin.n = parseFloat(document.getElementById('crsN').value) || 0;
-  worldOrigin.h = parseFloat(document.getElementById('crsH').value) || 0;
+function applyOrigin() {
+  objects.forEach(o => {
+    if (!o.worldPos) return; // manuelt tilførte objekter har ingen verdenskoordinat å forskyve fra
+    const { x, y, z } = o.worldPos;
+    o.mesh.position.set(x - worldOrigin.e, z - worldOrigin.h, -(y - worldOrigin.n));
+  });
+  if (selectedId !== null) selectObject(selectedId); // oppdater markeringsboksen til ny posisjon
 }
+
 ['crsE', 'crsN', 'crsH'].forEach(id => {
   document.getElementById(id).addEventListener('input', () => {
-    originAutoSet = false;
-    readOriginFields();
+    worldOrigin.e = parseFloat(document.getElementById('crsE').value) || 0;
+    worldOrigin.n = parseFloat(document.getElementById('crsN').value) || 0;
+    worldOrigin.h = parseFloat(document.getElementById('crsH').value) || 0;
+    applyOrigin();
   });
 });
 
-function addPipeFromData(data, i) {
-  const { x, y, z, od, t, l } = data;
-  const ro = od / 2, ri = ro - t;
-  const geo = buildGeometry('tube', { ro, ri, h: l, seg: 32 });
-  const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(PIPE_COLOR), metalness: 0.15, roughness: 0.55 });
+document.getElementById('recenterBtn').addEventListener('click', () => {
+  const withCoords = objects.filter(o => o.worldPos);
+  if (withCoords.length === 0) return;
+  const avgE = withCoords.reduce((s, o) => s + o.worldPos.x, 0) / withCoords.length;
+  const avgN = withCoords.reduce((s, o) => s + o.worldPos.y, 0) / withCoords.length;
+  const avgH = withCoords.reduce((s, o) => s + o.worldPos.z, 0) / withCoords.length;
+  worldOrigin = { e: avgE, n: avgN, h: avgH };
+  document.getElementById('crsE').value = avgE.toFixed(3);
+  document.getElementById('crsN').value = avgN.toFixed(3);
+  document.getElementById('crsH').value = avgH.toFixed(3);
+  applyOrigin();
+  fitViewToObjects();
+});
+
+const ROCK_COLOR = '#8C8C8C'; // steingrå, for bergsegment
+
+function addPipeSegment({ x, y, z, od, t, h, name, color, props }) {
+  const geo = buildGeometry('tube', { od, t, h, seg: 32 });
+  const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), metalness: 0.15, roughness: 0.55 });
   const mesh = new THREE.Mesh(geo, mat);
-  // Lokal posisjon = verdenskoordinat minus modellorigo (holder scenen nær 0,0,0)
-  mesh.position.set(x - worldOrigin.e, z - worldOrigin.h, y - worldOrigin.n);
+  // Lokal posisjon = verdenskoordinat minus modellorigo (origo er 0 som standard = faktiske koordinater)
+  // Merk: Z (three.js) negeres for nord, slik at akse-konverteringen til IFC (høyrehendt, Z opp)
+  // rekonstruerer riktig verdenskoordinat sammen med IfcMapConversion.
+  mesh.position.set(x - worldOrigin.e, z - worldOrigin.h, -(y - worldOrigin.n));
   const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
   mesh.add(edges);
   scene.add(mesh);
@@ -591,14 +713,54 @@ function addPipeFromData(data, i) {
   const id = idCounter++;
   mesh.userData.id = id;
   objects.push({
-    id, mesh, type: 'tube', params: { ro: +ro.toFixed(4), ri: +ri.toFixed(4), h: l },
-    name: `Rør_${i + 1}`,
-    ifcType: 'IFCPIPESEGMENT',
-    props: [
-      { k: 'X', v: String(x) }, { k: 'Y', v: String(y) }, { k: 'Z/kote', v: String(z) },
-      { k: 'Ytre diameter', v: String(od) }, { k: 'Tykkelse', v: String(t) },
-    ],
+    id, mesh, type: 'tube', params: { od: +od.toFixed(4), t: +t.toFixed(4), h: +h.toFixed(4) },
+    name, ifcType: 'IFCPIPESEGMENT',
+    worldPos: { x, y, z },
+    props, color,
   });
+}
+
+function addPipeFromData(data, i) {
+  const { x, y, z, od, t, l, name, extraProps, bergLen, losmasseLen } = data;
+  const baseName = name || `Rør_${i + 1}`;
+  const baseProps = [
+    { k: 'Øst (X)', v: String(x) }, { k: 'Nord (Y)', v: String(y) },
+    { k: 'Ytre diameter [m]', v: String(od) }, { k: 'Tykkelse [m]', v: String(t) },
+    ...(extraProps || []),
+  ];
+
+  const splitOn = document.getElementById('splitSegments').checked;
+  const lm = Number.isFinite(losmasseLen) ? Math.max(losmasseLen, 0) : NaN;
+  const bg = Number.isFinite(bergLen) ? Math.max(bergLen, 0) : NaN;
+  const hasSplit = splitOn && (lm > 0 || bg > 0);
+
+  if (!hasSplit) {
+    addPipeSegment({
+      x, y, z, od, t, h: l, name: baseName, color: PIPE_COLOR,
+      props: [{ k: 'Kote topp (Z)', v: String(z) }, ...baseProps],
+    });
+    return;
+  }
+
+  if (lm > 0) {
+    addPipeSegment({
+      x, y, z, od, t, h: lm, name: `${baseName}_løsmasser`, color: PIPE_COLOR,
+      props: [
+        { k: 'Segment', v: 'Løsmasser' }, { k: 'Kote topp (Z)', v: String(z) },
+        { k: 'Lengde segment [m]', v: String(lm) }, ...baseProps,
+      ],
+    });
+  }
+  if (bg > 0) {
+    const zBerg = z - (isNaN(lm) ? 0 : lm);
+    addPipeSegment({
+      x, y, z: zBerg, od, t, h: bg, name: `${baseName}_berg`, color: ROCK_COLOR,
+      props: [
+        { k: 'Segment', v: 'Berg' }, { k: 'Kote topp berg (Z)', v: String(zBerg) },
+        { k: 'Lengde segment [m]', v: String(bg) }, ...baseProps,
+      ],
+    });
+  }
 }
 
 function fitViewToObjects() {
@@ -622,16 +784,6 @@ document.getElementById('pipeFile').addEventListener('change', async (e) => {
   try {
     const rows = await readFileAsRows(file);
     const { pipes, errors } = rowsToPipes(rows);
-
-    if (originAutoSet && pipes.length > 0 && objects.length === 0) {
-      const avgE = pipes.reduce((s, p) => s + p.x, 0) / pipes.length;
-      const avgN = pipes.reduce((s, p) => s + p.y, 0) / pipes.length;
-      const avgH = pipes.reduce((s, p) => s + p.z, 0) / pipes.length;
-      worldOrigin = { e: avgE, n: avgN, h: avgH };
-      document.getElementById('crsE').value = avgE.toFixed(3);
-      document.getElementById('crsN').value = avgN.toFixed(3);
-      document.getElementById('crsH').value = avgH.toFixed(3);
-    }
 
     pipes.forEach((p, i) => addPipeFromData(p, objects.length + i));
     renderList();
@@ -743,8 +895,14 @@ function exportIFC() {
   const crsDatum = document.getElementById('crsDatum').value.trim() || 'EUREF89';
   const rotDeg = parseFloat(document.getElementById('crsRot').value) || 0;
   const rotRad = rotDeg * Math.PI / 180;
+  const bakeWorldCoords = document.getElementById('bakeWorldCoords').checked;
+  // Ved bakte verdenskoordinater legges origo direkte inn i hvert objekts plassering,
+  // og MapConversion-offset settes til 0 for å unngå dobbel forskyvning hos IFC-lesere som støtter IfcMapConversion.
+  const mapE = bakeWorldCoords ? 0 : worldOrigin.e;
+  const mapN = bakeWorldCoords ? 0 : worldOrigin.n;
+  const mapH = bakeWorldCoords ? 0 : worldOrigin.h;
   const projectedCrs = E(`IFCPROJECTEDCRS('${escStr(crsName)}',$,'${escStr(crsDatum)}',$,$,$,#${lenUnit})`);
-  E(`IFCMAPCONVERSION(#${ctx},#${projectedCrs},${F(worldOrigin.e)},${F(worldOrigin.n)},${F(worldOrigin.h)},${F(Math.cos(rotRad))},${F(Math.sin(rotRad))},1.)`);
+  E(`IFCMAPCONVERSION(#${ctx},#${projectedCrs},${F(mapE)},${F(mapN)},${F(mapH)},${F(Math.cos(rotRad))},${F(Math.sin(rotRad))},1.)`);
 
   const project = E(`IFCPROJECT('${ifcGuid()}',#${owner},'Parametrisk3DProsjekt',$,$,$,$,(#${ctx}),#${units})`);
 
@@ -760,12 +918,24 @@ function exportIFC() {
   E(`IFCRELAGGREGATES('${ifcGuid()}',#${owner},$,$,#${building},(#${storey}))`);
 
   const proxyIds = [];
+  const styleCache = {};
+  function getOrCreateStyle(hexColor) {
+    if (styleCache[hexColor]) return styleCache[hexColor];
+    const c = new THREE.Color(hexColor);
+    const colourId = E(`IFCCOLOURRGB($,${F(c.r)},${F(c.g)},${F(c.b)})`);
+    const shadingId = E(`IFCSURFACESTYLESHADING(#${colourId},0.)`);
+    const styleId = E(`IFCSURFACESTYLE('${escStr(hexColor)}',.BOTH.,(#${shadingId}))`);
+    styleCache[hexColor] = styleId;
+    return styleId;
+  }
 
   objects.forEach(o => {
     const p = o.params;
     const pos = o.mesh.position;
     // Konverter Three.js (Y opp) -> IFC (Z opp): X=x, Y=-z, Z=y
-    const ix = pos.x, iy = -pos.z, iz = pos.y;
+    const ix = pos.x + (bakeWorldCoords ? worldOrigin.e : 0);
+    const iy = -pos.z + (bakeWorldCoords ? worldOrigin.n : 0);
+    const iz = pos.y + (bakeWorldCoords ? worldOrigin.h : 0);
     let geomId, repType = 'CSG';
 
     if (o.type === 'box') {
@@ -793,16 +963,19 @@ function exportIFC() {
       geomId = E(`IFCCSGSOLID(#${sph})`);
     } else if (o.type === 'tube') {
       repType = 'SweptSolid';
-      const { ro, ri, h } = p;
+      const { od, t, h } = p;
+      const ro = od / 2;
       const profOrigin = E(`IFCCARTESIANPOINT((0.,0.))`);
       const profAx = E(`IFCAXIS2PLACEMENT2D(#${profOrigin},$)`);
-      const profile = E(`IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,$,#${profAx},${F(ro)},${F(ro - ri)})`);
+      const profile = E(`IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,$,#${profAx},${F(ro)},${F(t)})`);
       const extrudeAx = E(`IFCAXIS2PLACEMENT3D(#${origin},$,$)`);
-      const dir = E(`IFCDIRECTION((0.,0.,1.))`);
+      const dir = E(`IFCDIRECTION((0.,0.,-1.))`); // origo = topp av røret, strekker seg nedover
       geomId = E(`IFCEXTRUDEDAREASOLID(#${profile},#${extrudeAx},#${dir},${F(h)})`);
     }
 
     const shapeRep = E(`IFCSHAPEREPRESENTATION(#${ctx},'Body','${repType}',(#${geomId}))`);
+    const styleId = getOrCreateStyle(o.color || PIPE_COLOR);
+    E(`IFCSTYLEDITEM(#${geomId},(#${styleId}),$)`);
     const prodShape = E(`IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRep}))`);
     const objOrigin = E(`IFCCARTESIANPOINT((${F(ix)},${F(iy)},${F(iz)}))`);
     const objAx = E(`IFCAXIS2PLACEMENT3D(#${objOrigin},$,$)`);
