@@ -5,3 +5,4 @@
 - [Parametrisk 3D-modellering](./3D-modell.html)
 - [Protokolltolkning](./rorprotokoll.html)
 - [Ødometertolkning Janbu](./odometer_viewer.html)
+- [Treakstolkning](./triax_plotter.html)
