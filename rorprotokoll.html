@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rørprotokoll-tolker</title>
+<style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 2rem auto; max-width: 1100px; color: #1a1a1a; padding: 0 1rem; }
+    h1 { font-size: 1.6rem; margin-bottom: 0.2rem; }
+    .sub { color: #555; margin-bottom: 1.5rem; }
+    .dropzone {
+        border: 2px dashed #888; border-radius: 10px; padding: 2.5rem;
+        text-align: center; background: #fafafa; margin-bottom: 1.2rem;
+        transition: background 0.15s, border-color 0.15s; cursor: pointer;
+    }
+    .dropzone.dragover { background: #eef6ff; border-color: #2563eb; }
+    .dropzone p { margin: 0.3rem 0; color: #444; }
+    input[type=file] { margin-top: 0.8rem; }
+    button {
+        background: #2563eb; color: white; border: none; padding: 0.6rem 1.2rem;
+        border-radius: 6px; font-size: 1rem; cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button.secondary { background: #16a34a; }
+    button.secondary:hover { background: #15803d; }
+    button:disabled { background: #9ca3af; cursor: not-allowed; }
+    .flash { background: #fee2e2; color: #991b1b; padding: 0.7rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+    .status { color: #555; margin: 0.6rem 0; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1.5rem; font-size: 0.9rem; }
+    th, td { border: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; }
+    th { background: #f3f4f6; }
+    tr.sum-row { font-weight: bold; background: #f9fafb; }
+    .fil-navn { color: #777; font-size: 0.85rem; }
+    .actions { margin-top: 1rem; display: flex; gap: 0.6rem; align-items: center; }
+    .antall { color: #555; margin-top: 0.4rem; }
+    .merknad { color: #b45309; }
+    footer { margin-top: 3rem; color: #999; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+    <h1>Rørprotokoll-tolker</h1>
+    <p class="sub">Last opp PDF-protokoller for rørboring/rørspunt. Alt tolkes lokalt i nettleseren din - ingenting sendes til noen server.</p>
+
+    <div id="flash-area"></div>
+
+    <div class="dropzone" id="dropzone">
+        <p><strong>Dra og slipp PDF-er her</strong></p>
+        <p>eller</p>
+        <input type="file" id="file-input" accept="application/pdf" multiple>
+    </div>
+    <div class="status" id="status"></div>
+
+    <div id="results-area"></div>
+
+<footer>Kjører 100% lokalt i nettleseren via <a href="https://mozilla.github.io/pdf.js/" target="_blank" rel="noopener">pdf.js</a> og <a href="https://sheetjs.com/" target="_blank" rel="noopener">SheetJS</a>. Ingen data forlater denne siden.</footer>
+
+<script type="module">
+import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.worker.min.mjs";
+
+// ---------------------------------------------------------------------------
+// ror_parser_core.mjs
+// Kjerne-tolkningslogikk (portert fra ror_parser.py), skrevet slik at den
+// fungerer uendret i både Node (for testing) og nettleser (i standalone
+// HTML-filen). Forventer at pdfjsLib er tilgjengelig i scope når den brukes.
+
+const FIELD_SYNONYMS = {
+  pel_id: [/pel\s*nr/i, /pele\s*nr/i, /pel[e]?\s*id/i, /rør\s*id/i, /rørnr/i, /pæl\s*nr/i],
+  prosjekt_nr: [/prosjekt\s*nr/i],
+  prosjekt_navn: [/prosjekt\s*navn/i, /^prosjekt$/i],
+  dato: [/^dato\s*:?$/i, /protokolldato/i],
+  oppdragsgiver: [/oppdragsgiver/i, /byggherre/i],
+  anleggsleder: [/anleggsleder/i, /prosjektleder/i, /protokoll\s*ført\s*av/i],
+  borer: [/^borer\s*:?$/i, /maskinfører/i, /operatør/i],
+  dato_boret: [/dato\s*boret/i, /boredato/i],
+  borrsystem: [/borr?system(et)?/i],
+  dimensjon_foringsror: [/dimensjon\s*foringsr[øo]r/i],
+  rengjort: [/rengjort/i],
+  lengde_foringsror: [/lengde\s*foringsr[øo]r/i],
+  ror_i_fjell: [/r[øo]r\s*i\s*fjell/i, /r[øo]r\s*i\s*berg/i],
+};
+
+const LOSMASSE_KEYWORDS = [
+  "fyllmasse", "fylling", "leire", "sand", "grus", "morene", "jord",
+  "matjord", "torv", "silt", "myr", "løsmasse", "singel", "stein",
+];
+const BERG_KEYWORDS = ["fjell", "berg"];
+
+const SUMMARY_COLUMN_SYNONYMS = {
+  ror_id: [/rør\s*nr/i, /pel\s*nr/i, /pele\s*nr/i],
+  lengde_berg: [/rør\s*i\s*fj/i, /i\s*berg/i, /i\s*fjell/i],
+  lengde_total: [/^rør\s*m$/i, /^lengde/i, /^total/i],
+  merknad: [/merknad/i],
+};
+
+const LABEL_RE = /^([A-Za-zÆØÅæøå0-9/\[\]\.]+(?:\s[A-Za-zÆØÅæøå0-9/\[\]\.]+){0,3}):\s*(.*)$/;
+const BORERAPPORT_RE = /^\s*(\d+[.,]?\d*)\s*-\s*(\d+[.,]?\d*)\s+(.+?)\s*$/;
+
+function classifyFraksjon(text) {
+  const t = text.toLowerCase();
+  if (BERG_KEYWORDS.some((k) => t.includes(k))) return "berg";
+  if (LOSMASSE_KEYWORDS.some((k) => t.includes(k))) return "losmasse";
+  return "ukjent";
+}
+
+function toFloat(s) {
+  if (s === null || s === undefined) return null;
+  const cleaned = String(s).trim().replace(",", ".");
+  if (!cleaned) return null;
+  const v = parseFloat(cleaned);
+  return Number.isNaN(v) ? null : v;
+}
+
+function round(v, dp = 3) {
+  if (v === null || v === undefined) return null;
+  const f = 10 ** dp;
+  return Math.round(v * f) / f;
+}
+
+// ---------------------------------------------------------------------------
+// PDF -> posisjonerte tekst-tokens
+// ---------------------------------------------------------------------------
+async function extractPageItems(pdfjsLib, data) {
+  const doc = await pdfjsLib.getDocument({ data }).promise;
+  const pages = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const viewport = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent();
+    const items = [];
+    for (const it of content.items) {
+      if (!it.str || !it.str.trim()) continue;
+      items.push({
+        text: it.str,
+        x: it.transform[4],
+        top: viewport.height - it.transform[5],
+        width: it.width,
+        height: it.height || 8,
+      });
+    }
+    pages.push(items);
+  }
+  return pages;
+}
+
+// Grupper items i rader basert på "top"-posisjon.
+function groupRows(items) {
+  const sorted = [...items].sort((a, b) => a.top - b.top || a.x - b.x);
+  const rows = [];
+  for (const it of sorted) {
+    let row = rows.find((r) => Math.abs(r.top - it.top) <= 2.5);
+    if (!row) {
+      row = { top: it.top, items: [] };
+      rows.push(row);
+    }
+    row.items.push(it);
+  }
+  rows.forEach((r) => r.items.sort((a, b) => a.x - b.x));
+  rows.sort((a, b) => a.top - b.top);
+  return rows;
+}
+
+// Slå sammen items i en rad til "kolonner" basert på horisontal avstand.
+function rowToColumns(row) {
+  const cols = [];
+  for (const it of row.items) {
+    const last = cols[cols.length - 1];
+    if (last) {
+      const gap = it.x - (last.x + last.width);
+      const threshold = Math.max(it.height, last.height) * 1.3;
+      if (gap <= threshold) {
+        last.text = last.text + (gap > 1 ? " " : "") + it.text;
+        last.width = it.x + it.width - last.x;
+        continue;
+      }
+    }
+    cols.push({ text: it.text, x: it.x, width: it.width, height: it.height });
+  }
+  return cols;
+}
+
+function looksLikeHeading(row, refHeight) {
+  const avgHeight = row.items.reduce((s, i) => s + i.height, 0) / row.items.length;
+  return avgHeight > refHeight * 2.0;
+}
+
+// ---------------------------------------------------------------------------
+// Enkelt-protokoll (label:verdi-felt, ett rør per PDF)
+// ---------------------------------------------------------------------------
+function buildLabelValueMap(rows) {
+  const mapping = {};
+  const rowCols = rows.map((r) => ({ top: r.top, cols: rowToColumns(r), refHeight: r.items[0]?.height || 8 }));
+
+  for (let i = 0; i < rowCols.length; i++) {
+    const row = rowCols[i];
+    const parsed = row.cols.map((c) => {
+      const m = LABEL_RE.exec(c.text);
+      if (m) return { label: m[1].trim(), value: m[2].trim() || null, col: c };
+      return { label: null, value: c.text, col: c };
+    });
+
+    const labelCols = parsed.filter((p) => p.label !== null);
+    if (labelCols.length === 0) continue;
+
+    // Fest en umiddelbart etterfølgende ikke-etikett-kolonne på samme rad
+    // som verdi til foregående etikett (samme-rad "Label:  verdi"-mønster
+    // der verdien havnet i en egen kolonne pga. bredt mellomrom).
+    for (let j = 0; j < parsed.length; j++) {
+      if (parsed[j].label !== null && !parsed[j].value) {
+        const next = parsed[j + 1];
+        if (next && next.label === null && next.value) {
+          const gap = next.col.x - (parsed[j].col.x + parsed[j].col.width);
+          const threshold = Math.max(parsed[j].col.height || 8, 8) * 6;
+          if (gap < threshold) parsed[j].value = next.value;
+        }
+      }
+    }
+
+    const hasSameLineValue = labelCols.some((p) => p.value);
+    if (hasSameLineValue) {
+      for (const p of labelCols) {
+        if (p.value && mapping[p.label] === undefined) mapping[p.label] = p.value;
+      }
+      continue;
+    }
+
+    // Se etter neste rad med verdier - hopp over rader som ser ut som
+    // overskrifter (vesentlig større skrift enn etikett-raden).
+    let j = i + 1;
+    while (j < rowCols.length && rows[j] && looksLikeHeading(rows[j], row.refHeight)) j++;
+    if (j < rowCols.length) {
+      const valueCols = rowCols[j].cols;
+      if (valueCols.length === labelCols.length) {
+        labelCols.forEach((p, idx) => {
+          if (mapping[p.label] === undefined) mapping[p.label] = valueCols[idx].text.trim();
+        });
+      } else if (labelCols.length === 1 && valueCols.length >= 1) {
+        const combined = valueCols.map((c) => c.text).join(" ").trim();
+        if (mapping[labelCols[0].label] === undefined) mapping[labelCols[0].label] = combined;
+      }
+    }
+  }
+  return mapping;
+}
+
+function matchField(mapping, patterns) {
+  for (const [label, value] of Object.entries(mapping)) {
+    const norm = label.replace(/:$/, "").trim();
+    for (const pat of patterns) {
+      if (pat.test(norm)) return value.trim();
+    }
+  }
+  return null;
+}
+
+function parseBorerapport(rows) {
+  const out = [];
+  for (const row of rows) {
+    const cols = rowToColumns(row);
+    const lineText = cols.map((c) => c.text).join(" ");
+    const m = BORERAPPORT_RE.exec(lineText);
+    if (!m) continue;
+    const fra = toFloat(m[1]);
+    const til = toFloat(m[2]);
+    if (fra === null || til === null) continue;
+    const fraksjon = m[3].trim();
+    out.push({
+      fra_m: fra,
+      til_m: til,
+      fraksjon,
+      lengde_m: round(til - fra),
+      klasse: classifyFraksjon(fraksjon),
+    });
+  }
+  return out;
+}
+
+function parseSinglePelDocument(filnavn, rows) {
+  const mapping = buildLabelValueMap(rows);
+  const result = { fil: filnavn, type: "enkelt" };
+  for (const [field, patterns] of Object.entries(FIELD_SYNONYMS)) {
+    result[field] = matchField(mapping, patterns);
+  }
+
+  const borerapport = parseBorerapport(rows);
+  result.borerapport = borerapport;
+
+  const losmasse = round(borerapport.filter((r) => r.klasse === "losmasse").reduce((s, r) => s + r.lengde_m, 0));
+  const berg = round(borerapport.filter((r) => r.klasse === "berg").reduce((s, r) => s + r.lengde_m, 0));
+  result.lengde_losmasser_m = borerapport.length ? losmasse : null;
+  result.lengde_berg_m = borerapport.length ? berg : null;
+
+  const totalFraTabell = borerapport.length ? round(Math.max(...borerapport.map((r) => r.til_m))) : null;
+  result.lengde_total_m = totalFraTabell || toFloat(result.lengde_foringsror);
+
+  result.piler = [{
+    fil: filnavn,
+    prosjekt_nr: result.prosjekt_nr,
+    prosjekt_navn: result.prosjekt_navn,
+    oppdragsgiver: result.oppdragsgiver,
+    anleggsleder: result.anleggsleder,
+    dato: result.dato,
+    ror_id: result.pel_id,
+    lengde_total_m: result.lengde_total_m,
+    lengde_losmasser_m: result.lengde_losmasser_m,
+    lengde_berg_m: result.lengde_berg_m,
+    merknad: null,
+  }];
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Sammendrags-protokoll (tabell med flere rør/peler)
+// ---------------------------------------------------------------------------
+function parseSimpleInlineHeader(rows) {
+  const text = rows.map((r) => rowToColumns(r).map((c) => c.text).join(" ")).join("\n");
+  const out = {};
+  const patterns = {
+    prosjekt_navn: /Prosjekt\s*:\s*(.+)/i,
+    oppdragsgiver: /Oppdragsgiver\s*:\s*(.+)/i,
+    anleggsleder: /Protokoll\s*ført\s*av\s*:\s*(.+?)(?:\s{2,}Dato\s*:|\s+Dato\s*:|$)/i,
+    dato: /Dato\s*:\s*(\S+)/i,
+  };
+  for (const [field, pat] of Object.entries(patterns)) {
+    const m = pat.exec(text);
+    if (m) out[field] = m[1].trim();
+  }
+  return out;
+}
+
+function findSummaryHeaderBlock(rows) {
+  // Metode 1: én rad har allerede en kolonne som matcher et rør-ID-mønster
+  // direkte (f.eks. "Rør nr" på én linje).
+  let idx = rows.findIndex((r) =>
+    rowToColumns(r).some((c) => SUMMARY_COLUMN_SYNONYMS.ror_id.some((p) => p.test(c.text)))
+  );
+  if (idx !== -1) return idx;
+
+  // Metode 2: overskriften er delt over 2 rader (f.eks. "Rør" / "nr.").
+  // Finn i stedet den første raden der de(n) første kolonnen(e) er rene,
+  // fortløpende tall (1, 2, 3, ...) - dvs. starten på datarradene - og bruk
+  // radene like over som overskrift.
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rowToColumns(rows[i]);
+    if (!cols.length) continue;
+    const first = cols[0].text.trim();
+    if (/^1$/.test(first)) {
+      const next = rowToColumns(rows[i + 1] || { items: [] });
+      const secondIsTwo = next.length && /^2$/.test(next[0].text.trim());
+      if (secondIsTwo) {
+        // Overskriften er normalt de to radene rett over datastart.
+        return Math.max(0, i - 2);
+      }
+    }
+  }
+  return -1;
+}
+
+function tryParseSummaryTable(filnavn, rows) {
+  const headerStart = findSummaryHeaderBlock(rows);
+  if (headerStart === -1) return null;
+  let headerIdx = headerStart;
+
+  let headerCols = rowToColumns(rows[headerIdx]);
+  const nextRow = rows[headerIdx + 1];
+  if (nextRow) {
+    const nextCols = rowToColumns(nextRow);
+    const looksNumeric = nextCols.length && /^\d+$/.test(nextCols[0].text.trim());
+    if (!looksNumeric && nextRow.top - rows[headerIdx].top < 20) {
+      // slå sammen kolonnetekst basert på nærmeste x-posisjon
+      for (const nc of nextCols) {
+        let best = null;
+        let bestDist = Infinity;
+        for (const hc of headerCols) {
+          const dist = Math.abs(hc.x - nc.x);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = hc;
+          }
+        }
+        if (best && bestDist < 40) {
+          best.text = `${best.text} ${nc.text}`;
+        } else {
+          headerCols.push(nc);
+        }
+      }
+      headerIdx += 1;
+    }
+  }
+
+  const colField = {};
+  const used = new Set();
+  for (const field of ["ror_id", "lengde_berg", "lengde_total", "merknad"]) {
+    for (const hc of headerCols) {
+      if (used.has(hc)) continue;
+      if (SUMMARY_COLUMN_SYNONYMS[field].some((p) => p.test(hc.text))) {
+        colField[field] = hc;
+        used.add(hc);
+        break;
+      }
+    }
+  }
+  if (!colField.ror_id || (!colField.lengde_total && !colField.lengde_berg)) return null;
+
+  const dataRows = rows.slice(headerIdx + 1);
+  const bucket = new Map(); // header-col -> field name
+  for (const [field, hc] of Object.entries(colField)) bucket.set(hc, field);
+
+  function assignToColumn(item) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const hc of headerCols) {
+      const dist = Math.abs(hc.x - item.x);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = hc;
+      }
+    }
+    return best;
+  }
+
+  const piler = [];
+  for (const row of dataRows) {
+    const values = {};
+    for (const it of row.items) {
+      const col = assignToColumn(it);
+      const field = col ? bucket.get(col) : undefined;
+      if (field) values[field] = ((values[field] || "") + " " + it.text).trim();
+    }
+    const rorId = (values.ror_id || "").trim();
+    if (!rorId || rorId.toUpperCase() === "SUM") continue;
+    const total = toFloat(values.lengde_total);
+    const berg = toFloat(values.lengde_berg);
+    if (total === null && berg === null) continue; // ikke en reell datarad
+    const losmasse = total !== null && berg !== null ? round(total - berg) : null;
+    piler.push({
+      fil: filnavn,
+      ror_id: rorId,
+      lengde_total_m: total,
+      lengde_losmasser_m: losmasse,
+      lengde_berg_m: berg,
+      merknad: values.merknad ? values.merknad.trim() : null,
+    });
+  }
+
+  if (piler.length < 2) return null; // for lite til å regnes som en sammendragstabell
+
+  const headerInfo = parseSimpleInlineHeader(rows.slice(0, headerIdx));
+  for (const p of piler) Object.assign(p, {
+    prosjekt_nr: headerInfo.prosjekt_nr || null,
+    prosjekt_navn: headerInfo.prosjekt_navn || null,
+    oppdragsgiver: headerInfo.oppdragsgiver || null,
+    anleggsleder: headerInfo.anleggsleder || null,
+    dato: headerInfo.dato || null,
+  }, {}); // no-op to keep field order stable-ish
+
+  return {
+    fil: filnavn,
+    type: "sammendrag",
+    ...headerInfo,
+    antall_ror: piler.length,
+    piler,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Offentlig API
+// ---------------------------------------------------------------------------
+async function parsePdfBuffer(pdfjsLib, filnavn, arrayBufferLike) {
+  const pages = await extractPageItems(pdfjsLib, arrayBufferLike);
+  const allItems = pages.flat();
+  const rows = groupRows(allItems);
+
+  const summary = tryParseSummaryTable(filnavn, rows);
+  if (summary) return summary;
+
+  return parseSinglePelDocument(filnavn, rows);
+}
+
+// ---------------------------------------------------------------------------
+
+const FIELDNAMES = [
+    "fil", "prosjekt_nr", "prosjekt_navn", "oppdragsgiver", "anleggsleder",
+    "dato", "ror_id", "lengde_total_m", "lengde_losmasser_m", "lengde_berg_m", "merknad",
+];
+const COLUMN_TITLES = {
+    fil: "Fil", prosjekt_nr: "Prosjekt nr", prosjekt_navn: "Prosjekt",
+    oppdragsgiver: "Oppdragsgiver", anleggsleder: "Ansvarlig", dato: "Dato",
+    ror_id: "Rør-ID", lengde_total_m: "Total lengde (m)",
+    lengde_losmasser_m: "Lengde løsmasser (m)", lengde_berg_m: "Lengde berg (m)",
+    merknad: "Merknad",
+};
+const NUMERIC_FIELDS = new Set(["lengde_total_m", "lengde_losmasser_m", "lengde_berg_m"]);
+
+let lastResults = [];
+
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("file-input");
+const statusEl = document.getElementById("status");
+const flashArea = document.getElementById("flash-area");
+const resultsArea = document.getElementById("results-area");
+
+dropzone.addEventListener("click", () => fileInput.click());
+["dragenter", "dragover"].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add("dragover"); }));
+["dragleave", "drop"].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove("dragover"); }));
+dropzone.addEventListener("drop", (e) => {
+    const files = [...e.dataTransfer.files].filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+    handleFiles(files);
+});
+fileInput.addEventListener("change", () => handleFiles([...fileInput.files]));
+
+function showFlash(msg) {
+    flashArea.innerHTML = `<div class="flash">${msg}</div>`;
+}
+function clearFlash() { flashArea.innerHTML = ""; }
+
+async function handleFiles(files) {
+    if (!files.length) return;
+    clearFlash();
+    statusEl.textContent = `Tolker ${files.length} PDF-fil(er) ...`;
+
+    const results = [];
+    const errors = [];
+    for (const file of files) {
+        try {
+            const buf = new Uint8Array(await file.arrayBuffer());
+            const r = await parsePdfBuffer(pdfjsLib, file.name, buf);
+            results.push(r);
+        } catch (err) {
+            console.error(err);
+            errors.push(`Klarte ikke å tolke ${file.name}: ${err.message || err}`);
+        }
+    }
+
+    lastResults = results;
+    statusEl.textContent = "";
+    if (errors.length) showFlash(errors.join("<br>"));
+    renderResults(results);
+}
+
+function sumField(piler, field) {
+    return Math.round(piler.reduce((s, p) => s + (p[field] || 0), 0) * 100) / 100;
+}
+
+function renderResults(results) {
+    const piler = results.flatMap((r) => r.piler);
+    if (!piler.length) {
+        resultsArea.innerHTML = "";
+        return;
+    }
+    const sums = {
+        lengde_total_m: sumField(piler, "lengde_total_m"),
+        lengde_losmasser_m: sumField(piler, "lengde_losmasser_m"),
+        lengde_berg_m: sumField(piler, "lengde_berg_m"),
+    };
+
+    let html = `<p class="antall">${piler.length} rør/pel funnet fra ${results.length} fil(er).</p>`;
+    html += "<table><tr>";
+    for (const f of FIELDNAMES) html += `<th>${COLUMN_TITLES[f]}</th>`;
+    html += "</tr>";
+    for (const p of piler) {
+        html += "<tr>";
+        for (const f of FIELDNAMES) {
+            const val = p[f] === null || p[f] === undefined ? "" : p[f];
+            const cls = f === "merknad" && val ? ' class="merknad"' : f === "fil" ? ' class="fil-navn"' : "";
+            html += `<td${cls}>${escapeHtml(String(val))}</td>`;
+        }
+        html += "</tr>";
+    }
+    html += `<tr class="sum-row"><td colspan="${FIELDNAMES.length - 4}">SUM</td>` +
+        `<td>${sums.lengde_total_m}</td><td>${sums.lengde_losmasser_m}</td><td>${sums.lengde_berg_m}</td><td></td></tr>`;
+    html += "</table>";
+    html += '<div class="actions"><button class="secondary" id="excel-btn">Last ned Excel</button></div>';
+    resultsArea.innerHTML = html;
+    document.getElementById("excel-btn").addEventListener("click", () => downloadExcel(results));
+}
+
+function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function downloadExcel(results) {
+    const piler = results.flatMap((r) => r.piler);
+    const header = FIELDNAMES.map((f) => COLUMN_TITLES[f]);
+    const rows = piler.map((p) => FIELDNAMES.map((f) => (p[f] === null || p[f] === undefined ? "" : p[f])));
+
+    const sumRowIdx = rows.length + 2; // 1-basert Excel-rad for SUM (rad 1 = header)
+    const sumRow = FIELDNAMES.map((f) => {
+        if (!NUMERIC_FIELDS.has(f)) return f === "fil" ? "SUM" : "";
+        const col = XLSX.utils.encode_col(FIELDNAMES.indexOf(f));
+        return { f: `SUM(${col}2:${col}${rows.length + 1})` };
+    });
+
+    const aoa = [header, ...rows, sumRow];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = FIELDNAMES.map((f) => ({
+        wch: Math.min(40, Math.max(COLUMN_TITLES[f].length, ...piler.map((p) => String(p[f] ?? "").length)) + 2),
+    }));
+    for (const f of NUMERIC_FIELDS) {
+        const colIdx = FIELDNAMES.indexOf(f);
+        for (let r = 1; r <= rows.length + 1; r++) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c: colIdx })];
+            if (cell) cell.z = "0.00";
+        }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Rørprotokoller");
+    XLSX.writeFile(wb, "rorprotokoller.xlsx");
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</body>
+</html>
