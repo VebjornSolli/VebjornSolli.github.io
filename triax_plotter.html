@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Treaksialplotter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper: #f7f4ec;
+    --panel: #fffdf8;
+    --ink: #23261f;
+    --ink-soft: #5b5f52;
+    --line: #dcd6c4;
+    --grid: #e8e3d4;
+    --accent: #2c4a3e;
+    --accent-soft: #3f6a56;
+    --blue: #2c5f8a;
+    --red: #c0392b;
+    --black: #1a1a1a;
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/28px 28px,
+      var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:1600px;
+    margin:0 auto;
+    padding:20px 20px 40px;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+    padding-bottom:14px;
+    margin-bottom:18px;
+    border-bottom:2px solid var(--ink);
+  }
+  header .title-block{ display:flex; align-items:baseline; gap:12px; }
+  header h1{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:0.02em;
+    margin:0;
+    text-transform:uppercase;
+  }
+  header .subtitle{ font-size:12.5px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; }
+
+  .toolbar{ display:flex; align-items:center; gap:10px; }
+  .toolbar-divider{ width:1px; align-self:stretch; background:var(--line); margin:0 8px; }
+  .btn, label.btn{
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.01em;
+    padding:10px 16px; border-radius:var(--radius); border:1.5px solid var(--ink);
+    background:var(--panel); color:var(--ink); cursor:pointer;
+    transition:background .12s ease, color .12s ease, transform .05s ease, box-shadow .12s ease;
+  }
+  .btn:hover{ background:var(--ink); color:var(--paper); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.primary{
+    background:var(--accent); color:#fff; border-color:var(--accent);
+    box-shadow:0 2px 0 0 var(--ink); font-size:14px; padding:12px 20px;
+  }
+  .btn.primary:hover{ background:var(--accent-soft); border-color:var(--accent-soft); }
+  .btn.primary:active{ box-shadow:none; transform:translateY(2px); }
+  .btn-icon{ font-size:15px; line-height:1; }
+  button.btn:disabled{ opacity:0.4; cursor:not-allowed; background:var(--panel); color:var(--ink); }
+  input[type="file"]{ display:none; }
+
+  .layout{ display:flex; gap:20px; align-items:flex-start; }
+  .sidebar{ width:260px; flex:0 0 260px; display:flex; flex-direction:column; gap:14px; }
+  .panel{ background:var(--panel); border:1.5px solid var(--line); border-radius:var(--radius); padding:14px 14px 16px; }
+  .panel > .panel-title{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600;
+    letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft);
+    margin:0 0 10px; padding-bottom:8px; border-bottom:1px solid var(--line);
+  }
+  .panel > .panel-title.no-caps{ text-transform:none; letter-spacing:0.02em; font-size:12px; }
+  .field-label sub, .plot-label sub, .panel-title sub, .readout sub{ font-size:0.72em; vertical-align:sub; line-height:0; }
+
+  .field{ margin-bottom:12px; }
+  .field:last-child{ margin-bottom:0; }
+  .field-label{ display:flex; justify-content:space-between; align-items:center; font-size:12.5px; font-weight:600; margin-bottom:5px; }
+  .field-label .sym{ font-family:'IBM Plex Mono',monospace; }
+  .field-row{ display:flex; align-items:center; gap:8px; }
+  input[type="range"]{ -webkit-appearance:none; flex:1; height:4px; border-radius:2px; background:var(--line); outline:none; }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--accent); border:2px solid var(--panel); box-shadow:0 0 0 1px var(--accent); cursor:pointer;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:12px; height:12px; border-radius:50%;
+    background:var(--accent); border:2px solid var(--panel); box-shadow:0 0 0 1px var(--accent); cursor:pointer;
+  }
+  input[type="number"]{
+    width:64px; font-family:'IBM Plex Mono',monospace; font-size:12.5px;
+    padding:4px 6px; border:1px solid var(--line); border-radius:2px; background:#fff; color:var(--ink);
+  }
+  input[type="number"]:focus, input[type="range"]:focus{ outline:2px solid var(--accent-soft); outline-offset:1px; }
+
+  .readout{
+    display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px; padding:4px 0; border-bottom:1px dashed var(--line);
+  }
+  .readout:last-child{ border-bottom:none; }
+  .readout .k{ color:var(--ink-soft); }
+  .readout .v{ font-weight:600; }
+
+  .swatch{ display:inline-block; width:14px; height:3px; margin-right:6px; vertical-align:middle; }
+  .swatch.dot{ width:8px; height:8px; border-radius:50%; margin-right:7px; }
+
+  .plot-area{ flex:1; min-width:0; display:flex; flex-direction:column; gap:16px; }
+  .plot-row{ display:flex; gap:16px; flex-wrap:wrap; }
+  .plot-panel{ background:var(--panel); border:1.5px solid var(--line); border-radius:var(--radius); padding:10px 14px 14px; flex:1 1 420px; min-width:0; }
+  .plot-panel .plot-label{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-soft);
+    letter-spacing:0.02em; margin-bottom:2px;
+  }
+  canvas{ display:block; width:100%; }
+  #plot1{ height:460px; }
+  #plot2{ height:460px; }
+
+  .empty-state{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+    height:460px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; font-size:13px; text-align:center;
+    border:1.5px dashed var(--line); border-radius:var(--radius); background:var(--panel);
+  }
+
+  footer{ margin-top:22px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); text-align:right; }
+
+  @media (max-width: 980px){
+    .layout{ flex-direction:column; }
+    .sidebar{ width:100%; flex:1; flex-direction:row; flex-wrap:wrap; }
+    .sidebar .panel{ flex:1 1 220px; }
+  }
+</style>
+</head>
+<body>
+<!-- forces the browser to fetch the glyph ranges (Greek incl.) for these fonts before we draw them on <canvas> -->
+<div aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;visibility:hidden;">
+  <span style="font-family:'IBM Plex Mono',monospace;">φτεσΩ'ₐᵤᵣmax</span>
+  <span style="font-family:'Inter',sans-serif;">φτεσΩ'ₐᵤᵣmax</span>
+</div>
+<div class="app">
+
+  <header>
+    <div class="title-block">
+      <h1>Treaksialplotter</h1>
+      <span class="subtitle">treaksialforsøk · p'–q–τ<sub>max</sub></span>
+    </div>
+    <div class="toolbar">
+      <label class="btn primary" for="fileInput" id="openLabel">
+        <span class="btn-icon">⇪</span> Åpne Excel-fil
+      </label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <span class="toolbar-divider"></span>
+      <button class="btn" id="saveBtn" disabled>Lagre resultater</button>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <aside class="sidebar">
+
+      <div class="panel">
+        <p class="panel-title no-caps">Tangentlinje (p'–q)</p>
+
+        <div class="field">
+          <div class="field-label"><span class="sym">a</span></div>
+          <div class="field-row">
+            <input type="number" id="aInput" value="10" step="1" style="width:100%;">
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span class="sym">φ</span></div>
+          <div class="field-row">
+            <input type="range" id="phiSlider" min="0" max="50" step="0.1" value="30">
+            <input type="number" id="phiInput" value="30" step="0.1">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p class="panel-title no-caps">Skjærstyrke (τ<sub>max</sub>)</p>
+        <div class="field">
+          <div class="field-label"><span class="sym">s<sub>u</sub></span></div>
+          <div class="field-row">
+            <input type="range" id="suSlider" min="0" max="100" step="0.1" value="20">
+            <input type="number" id="suInput" value="20" step="0.1">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p class="panel-title">Resultater</p>
+        <div class="readout"><span class="k">M</span><span class="v" id="outM">–</span></div>
+        <div class="readout"><span class="k">p' ∩</span><span class="v" id="outPint">–</span></div>
+        <div class="readout"><span class="k">q ∩</span><span class="v" id="outQint">–</span></div>
+        <div class="readout"><span class="k">ε ved M-skj.</span><span class="v" id="outEpsM">–</span></div>
+        <div class="readout"><span class="k">ε ved s<sub>u</sub></span><span class="v" id="outEps">–</span></div>
+      </div>
+
+      <div class="panel">
+        <p class="panel-title">Tegnforklaring</p>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
+          <div><span class="swatch" style="background:var(--accent);"></span>p'–q kurve</div>
+          <div><span class="swatch" style="background:var(--red);border-top:2px dashed var(--red);height:0;"></span>Tangentlinje</div>
+          <div><span class="swatch dot" style="background:var(--red);"></span>a (skjæring p'-akse)</div>
+          <div><span class="swatch" style="background:var(--blue);"></span>τ<sub>max</sub>–tøyning</div>
+          <div><span class="swatch" style="background:var(--red);border-top:2px dashed var(--red);height:0;"></span>s<sub>u</sub>-linje</div>
+        </div>
+      </div>
+
+    </aside>
+
+    <main class="plot-area">
+      <div id="emptyState" class="empty-state">
+        <div>Ingen data lastet inn ennå</div>
+        <div>Klikk «Åpne Excel-fil» for å starte</div>
+      </div>
+
+      <div class="plot-row" id="plotRow" style="display:none;">
+        <div class="plot-panel">
+          <div class="plot-label" id="plot1Label">p'–q plot</div>
+          <canvas id="plot1"></canvas>
+        </div>
+        <div class="plot-panel">
+          <div class="plot-label" id="plot2Label">τ<sub>max</sub> – tøyning</div>
+          <canvas id="plot2"></canvas>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <footer>treaksialplotter · kjører lokalt i nettleseren, ingen data sendes noe sted</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================
+     KONSTANTER
+     ========================================================= */
+  const COLORS = {
+    curve:   '#2c4a3e',
+    tangent: '#c0392b',
+    point:   '#c0392b',
+    tau:     '#2c5f8a',
+    suLine:  '#c0392b',
+    grid:    '#d9d2bc',
+    gridMinor: '#efebe0',
+    axis:    '#23261f',
+    tick:    '#5b5f52',
+    zero:    '#1a1a1a',
+    bg:      '#fffdf8'
+  };
+  const FONT_UI   = 'Inter, Arial, sans-serif';
+  const FONT_MONO = '"IBM Plex Mono", monospace';
+
+  /* =========================================================
+     TILSTAND
+     ========================================================= */
+  const state = {
+    data: null,          // [{p, q, tauMax, strain}, ...]
+    ranges: { pMax: 100, qMax: 100, tauMin: 0, tauMax: 100, strainMax: 10 },
+    params: { a: 10, phi: 30, su: 20 }
+  };
+
+  /* =========================================================
+     DOM
+     ========================================================= */
+  const $ = id => document.getElementById(id);
+  const dom = {
+    fileInput:  $('fileInput'),
+    openLabel:  $('openLabel'),
+    saveBtn:    $('saveBtn'),
+    emptyState: $('emptyState'),
+    plotRow:    $('plotRow'),
+    canvas1:    $('plot1'),
+    canvas2:    $('plot2'),
+    plot1Label: $('plot1Label'),
+    plot2Label: $('plot2Label'),
+    out: { M: $('outM'), pInt: $('outPint'), qInt: $('outQint'), epsM: $('outEpsM'), eps: $('outEps') },
+    controls: {
+      a:   { slider: null,            input: $('aInput') },
+      phi: { slider: $('phiSlider'),  input: $('phiInput') },
+      su:  { slider: $('suSlider'),   input: $('suInput') }
+    }
+  };
+
+  /* =========================================================
+     SKALA-/TEKST-/AKSEHJELPERE (samme mønster som ødometerplotteren)
+     ========================================================= */
+  function linearScale(d0, d1, r0, r1){
+    const span = (d1 - d0) || 1;
+    return v => r0 + ((v - d0) / span) * (r1 - r0);
+  }
+
+  function niceNum(range, round){
+    if(range === 0) return 1;
+    const exponent = Math.floor(Math.log10(range));
+    const fraction = range / Math.pow(10, exponent);
+    let niceFraction;
+    if(round){
+      if(fraction < 1.5) niceFraction = 1;
+      else if(fraction < 3) niceFraction = 2;
+      else if(fraction < 7) niceFraction = 5;
+      else niceFraction = 10;
+    } else {
+      if(fraction <= 1) niceFraction = 1;
+      else if(fraction <= 2) niceFraction = 2;
+      else if(fraction <= 5) niceFraction = 5;
+      else niceFraction = 10;
+    }
+    return niceFraction * Math.pow(10, exponent);
+  }
+
+  function niceTicks(min, max, maxTicks){
+    maxTicks = maxTicks || 6;
+    if(max <= min) max = min + 1;
+    const range = niceNum(max - min, false);
+    const step = niceNum(range / (maxTicks - 1), true);
+    const niceMin = Math.floor(min / step) * step;
+    const niceMax = Math.ceil(max / step) * step;
+    const ticks = [];
+    for(let v = niceMin; v <= niceMax + step / 1000; v += step){
+      ticks.push(Math.round(v / step) * step);
+    }
+    return ticks;
+  }
+
+  function fmt(v){
+    if(Math.abs(v) < 0.0001) return '0';
+    if(Math.abs(v) >= 100) return v.toFixed(0);
+    if(Math.abs(v) >= 10) return v.toFixed(1);
+    return v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
+  // Finner et fint steg for hovedlinjer (med tall) og et finere steg for
+  // hjelpelinjer (uten tall), slik at f.eks. en kPa-akse får hjelpelinjer
+  // hver 5. kPa og hovedlinjer med lesbar avstand (25/50/100 osv.).
+  function computeGridSteps(range, minorStep, majorCandidates){
+    const minor = minorStep;
+    let major = majorCandidates.find(c => range / c <= 10);
+    if(!major) major = majorCandidates[majorCandidates.length - 1];
+    if(major < minor) major = minor;
+    return { major, minor };
+  }
+
+  function stepTicks(min, max, step){
+    const start = Math.ceil(min / step) * step;
+    const ticks = [];
+    for(let v = start; v <= max + step / 1000; v += step){
+      ticks.push(Math.round(v / step) * step);
+    }
+    return ticks;
+  }
+
+  function drawLabel(ctx, segments, x, y, align, fontFamily, weight){
+    weight = weight || '600';
+    fontFamily = fontFamily || FONT_UI;
+    const baseSize = 12, subSize = 9;
+    const baseFont = weight + ' ' + baseSize + 'px ' + fontFamily;
+    const subFont  = weight + ' ' + subSize + 'px ' + fontFamily;
+
+    let total = 0;
+    segments.forEach(([t, sub]) => {
+      ctx.font = sub ? subFont : baseFont;
+      total += ctx.measureText(t).width;
+    });
+
+    let startX = x;
+    if(align === 'center') startX = x - total / 2;
+    else if(align === 'right') startX = x - total;
+
+    const prevAlign = ctx.textAlign, prevBaseline = ctx.textBaseline;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    let cx = startX;
+    segments.forEach(([t, sub]) => {
+      ctx.font = sub ? subFont : baseFont;
+      ctx.fillText(t, cx, sub ? y + 3 : y);
+      cx += ctx.measureText(t).width;
+    });
+    ctx.textAlign = prevAlign;
+    ctx.textBaseline = prevBaseline;
+  }
+
+  function measureLabelWidth(ctx, segments, fontFamily, weight){
+    weight = weight || '600';
+    fontFamily = fontFamily || FONT_UI;
+    const baseFont = weight + ' 12px ' + fontFamily;
+    const subFont  = weight + ' 9px ' + fontFamily;
+    let total = 0;
+    segments.forEach(([t, sub]) => {
+      ctx.font = sub ? subFont : baseFont;
+      total += ctx.measureText(t).width;
+    });
+    return total;
+  }
+
+  function prepareCanvas(canvas, cssHeight){
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.getBoundingClientRect().width || canvas.parentElement.clientWidth;
+    canvas.style.height = cssHeight + 'px';
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(cssHeight * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, cssHeight);
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, w, cssHeight);
+    return { ctx, w, h: cssHeight };
+  }
+
+  function drawXGrid(ctx, majorTicks, minorTicks, xMin, xMax, xToPx, top, bottom){
+    // hjelpelinjer (lyse, ingen tall)
+    ctx.strokeStyle = COLORS.gridMinor;
+    ctx.lineWidth = 1;
+    minorTicks.forEach(t => {
+      if(t < xMin || t > xMax) return;
+      const px = xToPx(t);
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, bottom); ctx.stroke();
+    });
+    // hovedlinjer (tydeligere, med tall)
+    ctx.font = '11px ' + FONT_MONO;
+    ctx.fillStyle = COLORS.tick;
+    ctx.strokeStyle = COLORS.grid;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    majorTicks.forEach(t => {
+      if(t < xMin || t > xMax) return;
+      const px = xToPx(t);
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, bottom); ctx.stroke();
+      ctx.fillText(fmt(t), px, bottom + 6);
+    });
+  }
+
+  function drawYGridLeft(ctx, majorTicks, minorTicks, yMin, yMax, yToPx, left, right, labelX){
+    ctx.strokeStyle = COLORS.gridMinor;
+    ctx.lineWidth = 1;
+    minorTicks.forEach(t => {
+      if(t < yMin || t > yMax) return;
+      const py = yToPx(t);
+      ctx.beginPath(); ctx.moveTo(left, py); ctx.lineTo(right, py); ctx.stroke();
+    });
+    ctx.font = '11px ' + FONT_MONO;
+    ctx.fillStyle = COLORS.tick;
+    ctx.strokeStyle = COLORS.grid;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    majorTicks.forEach(t => {
+      if(t < yMin || t > yMax) return;
+      const py = yToPx(t);
+      ctx.beginPath(); ctx.moveTo(left, py); ctx.lineTo(right, py); ctx.stroke();
+      ctx.fillText(fmt(t), labelX, py);
+    });
+  }
+
+  function drawFrame(ctx, x, y, w, h){
+    ctx.strokeStyle = COLORS.axis;
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(x, y, w, h);
+  }
+
+  function drawSeries(ctx, points, color, lineWidth){
+    if(!points.length) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    points.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
+    ctx.stroke();
+  }
+
+  function withClip(ctx, x, y, w, h, fn){
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    fn();
+    ctx.restore();
+  }
+
+  /* =========================================================
+     GEOTEKNISKE BEREGNINGER
+     ========================================================= */
+  function computeM(phiDeg){
+    const phiRad = phiDeg * Math.PI / 180;
+    return (6 * Math.sin(phiRad)) / (3 - Math.sin(phiRad));
+  }
+
+  // Finner datapunktet på p'-q-kurven som ligger nærmest tangentlinjen.
+  function findIntersection(data, M, a){
+    let bestIdx = -1, bestDiff = Infinity;
+    data.forEach((d, i) => {
+      if(isNaN(d.p) || isNaN(d.q)) return;
+      const qTangent = M * (d.p + a);
+      const diff = Math.abs(d.q - qTangent);
+      if(diff < bestDiff){ bestDiff = diff; bestIdx = i; }
+    });
+    return bestIdx >= 0 ? data[bestIdx] : null;
+  }
+
+  // Finner tøyningen ved det punktet der tau_max er nærmest s_u.
+  function findStrainAtSu(data, su){
+    let bestIdx = -1, bestDiff = Infinity;
+    data.forEach((d, i) => {
+      if(isNaN(d.tauMax) || isNaN(d.strain)) return;
+      const diff = Math.abs(d.tauMax - su);
+      if(diff < bestDiff){ bestDiff = diff; bestIdx = i; }
+    });
+    return bestIdx >= 0 ? data[bestIdx].strain : null;
+  }
+
+  /* =========================================================
+     PLOT 1: p'–q med tangentlinje
+     ========================================================= */
+  function renderPlot1(){
+    const { ctx, w, h } = prepareCanvas(dom.canvas1, 460);
+    const marginL = 56, marginR = 20, marginT = 18, marginB = 42;
+    const plotW = Math.max(10, w - marginL - marginR);
+    const plotH = Math.max(10, h - marginT - marginB);
+    const top = marginT, bottom = marginT + plotH, left = marginL, right = marginL + plotW;
+
+    const { params, ranges } = state;
+    const xMin = -20, xMax = Math.max(ranges.pMax * 1.1, xMin + 1);
+    const yMin = 0, yMax = Math.max(ranges.qMax * 1.1, 1);
+
+    const xToPx = linearScale(xMin, xMax, left, right);
+    const yToPx = linearScale(yMin, yMax, bottom, top);
+
+    // p' og q er begge i kPa: hjelpelinjer hver 5 kPa, hovedlinjer med tall
+    // valgt så det blir maks ca. 10 av dem (25/50/100 kPa osv.).
+    const kpaMajors = [5, 10, 25, 50, 100, 200, 250, 500, 1000];
+    const xSteps = computeGridSteps(xMax - xMin, 5, kpaMajors);
+    const ySteps = computeGridSteps(yMax - yMin, 5, kpaMajors);
+    const xMajor = stepTicks(xMin, xMax, xSteps.major);
+    const xMinor = stepTicks(xMin, xMax, xSteps.minor);
+    const yMajor = stepTicks(yMin, yMax, ySteps.major);
+    const yMinor = stepTicks(yMin, yMax, ySteps.minor);
+
+    drawXGrid(ctx, xMajor, xMinor, xMin, xMax, xToPx, top, bottom);
+    drawYGridLeft(ctx, yMajor, yMinor, yMin, yMax, yToPx, left, right, left - 8);
+    drawFrame(ctx, left, top, plotW, plotH);
+
+    const M = computeM(params.phi);
+
+    withClip(ctx, left, top, plotW, plotH, () => {
+      // nullreferanselinjer
+      ctx.strokeStyle = COLORS.zero; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(xToPx(0), top); ctx.lineTo(xToPx(0), bottom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(left, yToPx(0)); ctx.lineTo(right, yToPx(0)); ctx.stroke();
+
+      // p'-q kurve
+      if(state.data && state.data.length){
+        drawSeries(
+          ctx,
+          state.data.filter(d => !isNaN(d.p) && !isNaN(d.q)).map(d => [xToPx(d.p), yToPx(d.q)]),
+          COLORS.curve, 2
+        );
+      }
+
+      // tangentlinje: q = M*(p'+a)
+      ctx.strokeStyle = COLORS.tangent; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
+      ctx.beginPath();
+      ctx.moveTo(xToPx(xMin), yToPx(M * (xMin + params.a)));
+      ctx.lineTo(xToPx(xMax), yToPx(M * (xMax + params.a)));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // skjæringspunkt med p'-aksen ved x = -a
+      ctx.fillStyle = COLORS.point;
+      ctx.beginPath();
+      ctx.arc(xToPx(-params.a), yToPx(0), 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // info-boks med skjæringspunktet mellom kurve og tangent
+    const intersection = state.data ? findIntersection(state.data, M, params.a) : null;
+    if(intersection){
+      const boxX = left + 10, boxY = top + 10, boxW = 148, boxH = 60;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.strokeStyle = COLORS.grid;
+      ctx.lineWidth = 1;
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
+      ctx.fillStyle = COLORS.axis;
+      drawLabel(ctx, [["p' = ", 0], [fmt(intersection.p), 0], [' kPa', 0]], boxX + 10, boxY + 18, 'left', FONT_MONO, '500');
+      drawLabel(ctx, [['q = ', 0], [fmt(intersection.q), 0], [' kPa', 0]], boxX + 10, boxY + 34, 'left', FONT_MONO, '500');
+      if(!isNaN(intersection.strain)){
+        drawLabel(ctx, [['ε = ', 0], [fmt(intersection.strain), 0], [' %', 0]], boxX + 10, boxY + 50, 'left', FONT_MONO, '500');
+      }
+    }
+
+    ctx.fillStyle = COLORS.axis;
+    drawLabel(ctx, [["p' [kPa]", 0]], left + plotW / 2, h - 4, 'center');
+    ctx.save();
+    ctx.translate(14, top + plotH / 2); ctx.rotate(-Math.PI / 2);
+    drawLabel(ctx, [['q [kPa]', 0]], 0, 0, 'center');
+    ctx.restore();
+
+    updateReadouts(M, intersection);
+  }
+
+  /* =========================================================
+     PLOT 2: τmax – tøyning med s_u-linje
+     ========================================================= */
+  function renderPlot2(){
+    const { ctx, w, h } = prepareCanvas(dom.canvas2, 460);
+    const marginL = 56, marginR = 20, marginT = 18, marginB = 42;
+    const plotW = Math.max(10, w - marginL - marginR);
+    const plotH = Math.max(10, h - marginT - marginB);
+    const top = marginT, bottom = marginT + plotH, left = marginL, right = marginL + plotW;
+
+    const { ranges, params } = state;
+    const xMin = 0, xMax = Math.max(ranges.strainMax * 1.05, 1);
+    const span = ranges.tauMax - ranges.tauMin;
+    const yMin = Math.max(0, ranges.tauMin - span * 0.05);
+    const yMax = ranges.tauMax + span * 0.05 || 1;
+
+    const xToPx = linearScale(xMin, xMax, left, right);
+    const yToPx = linearScale(yMin, yMax, bottom, top);
+
+    const xMajor = niceTicks(xMin, xMax, 7);   // tøyning i %: vanlig fin inndeling
+    const kpaMajors = [5, 10, 25, 50, 100, 200, 250, 500, 1000];
+    const ySteps = computeGridSteps(yMax - yMin, 5, kpaMajors);   // τmax i kPa: hver 5 kPa
+    const yMajor = stepTicks(yMin, yMax, ySteps.major);
+    const yMinor = stepTicks(yMin, yMax, ySteps.minor);
+
+    drawXGrid(ctx, xMajor, [], xMin, xMax, xToPx, top, bottom);
+    drawYGridLeft(ctx, yMajor, yMinor, yMin, yMax, yToPx, left, right, left - 8);
+    drawFrame(ctx, left, top, plotW, plotH);
+
+    withClip(ctx, left, top, plotW, plotH, () => {
+      if(state.data && state.data.length){
+        drawSeries(
+          ctx,
+          state.data.filter(d => !isNaN(d.strain) && !isNaN(d.tauMax)).map(d => [xToPx(d.strain), yToPx(d.tauMax)]),
+          COLORS.tau, 2
+        );
+      }
+
+      // s_u-linje
+      ctx.strokeStyle = COLORS.suLine; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
+      ctx.beginPath();
+      ctx.moveTo(left, yToPx(params.su)); ctx.lineTo(right, yToPx(params.su));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    ctx.fillStyle = COLORS.axis;
+    drawLabel(ctx, [['Tøyning [%]', 0]], left + plotW / 2, h - 4, 'center');
+    ctx.save();
+    ctx.translate(14, top + plotH / 2); ctx.rotate(-Math.PI / 2);
+    drawLabel(ctx, [['τ', 0], ['max', 1], [' [kPa]', 0]], 0, 0, 'center');
+    ctx.restore();
+  }
+
+  function updateReadouts(M, intersection){
+    dom.out.M.textContent = M.toFixed(3);
+    dom.out.pInt.textContent = intersection ? fmt(intersection.p) + ' kPa' : '–';
+    dom.out.qInt.textContent = intersection ? fmt(intersection.q) + ' kPa' : '–';
+    const epsAtM = intersection && !isNaN(intersection.strain) ? intersection.strain : null;
+    dom.out.epsM.textContent = epsAtM !== null ? fmt(epsAtM) + ' %' : '–';
+
+    const eps = state.data ? findStrainAtSu(state.data, state.params.su) : null;
+    dom.out.eps.textContent = eps !== null ? fmt(eps) + ' %' : '–';
+    dom.plot2Label.innerHTML = 'τ<sub>max</sub> – tøyning · s<sub>u</sub> = ' + state.params.su.toFixed(1) + ' kPa'
+      + (eps !== null ? ', ε = ' + fmt(eps) + ' %' : '');
+    dom.plot1Label.textContent = "p'–q plot · a = " + state.params.a.toFixed(2)
+      + ', φ = ' + state.params.phi.toFixed(1) + '°, M = ' + M.toFixed(3)
+      + (epsAtM !== null ? ', ε = ' + fmt(epsAtM) + ' %' : '');
+  }
+
+  function renderAll(){
+    if(!state.data) return;
+    renderPlot1();
+    renderPlot2();
+  }
+
+  let renderScheduled = false;
+  function scheduleRender(){
+    if(renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(() => { renderScheduled = false; renderAll(); });
+  }
+
+  /* =========================================================
+     PARAMETER-BINDING
+     ========================================================= */
+  function bindControl(key, { slider, input }){
+    function apply(value){
+      if(isNaN(value)) return;
+      state.params[key] = value;
+      if(slider) slider.value = value;
+      input.value = value;
+      scheduleRender();
+    }
+    if(slider) slider.addEventListener('input', () => apply(parseFloat(slider.value)));
+    input.addEventListener('input', () => apply(parseFloat(input.value)));
+    input.addEventListener('change', () => apply(parseFloat(input.value)));
+  }
+  Object.keys(dom.controls).forEach(key => bindControl(key, dom.controls[key]));
+
+  /* =========================================================
+     INNLESING AV EXCEL-FIL
+     ========================================================= */
+  function normalizeKey(k){
+    return String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function toNum(v){
+    if(v === null || v === undefined || v === '') return NaN;
+    return typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.'));
+  }
+
+  function detectColumns(headerKeys){
+    const cols = { p: null, q: null, tauMax: null, strain: null };
+    headerKeys.forEach(k => {
+      const nk = normalizeKey(k);
+      if(nk === 'p') cols.p = k;
+      else if(nk === 'q') cols.q = k;
+      else if(nk.includes('taumax')) cols.tauMax = k;
+      else if(nk.includes('epsilon')) cols.strain = k;
+    });
+    return cols;
+  }
+
+  function parseRows(rows){
+    if(!rows.length) throw new Error('Fant ingen rader i filen.');
+    const cols = detectColumns(Object.keys(rows[0]));
+    if(!cols.p || !cols.q){
+      throw new Error('Fant ikke kolonnene "p\'" og/eller "q" i filen.');
+    }
+    const data = rows.map(r => ({
+      p:       toNum(r[cols.p]),
+      q:       toNum(r[cols.q]),
+      tauMax:  cols.tauMax ? toNum(r[cols.tauMax]) : NaN,
+      strain:  cols.strain ? toNum(r[cols.strain]) : NaN
+    }));
+
+    const only = arr => arr.filter(v => !isNaN(v));
+    const pVals      = only(data.map(d => d.p));
+    const qVals      = only(data.map(d => d.q));
+    const tauVals    = only(data.map(d => d.tauMax));
+    const strainVals = only(data.map(d => d.strain));
+
+    return {
+      data,
+      ranges: {
+        pMax:      pVals.length ? Math.max(...pVals) : 100,
+        qMax:      qVals.length ? Math.max(...qVals) : 100,
+        tauMin:    tauVals.length ? Math.min(...tauVals) : 0,
+        tauMax:    tauVals.length ? Math.max(...tauVals) : 100,
+        strainMax: strainVals.length ? Math.max(...strainVals) : 10
+      }
+    };
+  }
+
+  function applyLoadedData(parsed){
+    state.data = parsed.data;
+    state.ranges = parsed.ranges;
+
+    const c = dom.controls;
+    state.params.a = 10;
+    state.params.phi = 30;
+    c.a.input.value = 10;
+    c.phi.slider.value = 30; c.phi.input.value = 30;
+
+    c.su.slider.min = state.ranges.tauMin;
+    c.su.slider.max = state.ranges.tauMax;
+    const suDefault = Math.min(Math.max(20, state.ranges.tauMin), state.ranges.tauMax);
+    state.params.su = suDefault;
+    c.su.slider.value = suDefault;
+    c.su.input.value = suDefault;
+
+    dom.emptyState.style.display = 'none';
+    dom.plotRow.style.display = '';
+    dom.saveBtn.disabled = false;
+    dom.openLabel.innerHTML = '<span class="btn-icon">⇪</span> Bytt fil';
+
+    const draw = () => renderAll();
+    if(document.fonts && document.fonts.ready){
+      document.fonts.ready.then(draw).catch(draw);
+    } else {
+      draw();
+    }
+  }
+
+  dom.fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try{
+        const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+        applyLoadedData(parseRows(rows));
+      }catch(err){
+        alert('Klarte ikke å lese Excel-filen: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    dom.fileInput.value = '';
+  });
+
+  /* =========================================================
+     RESIZE
+     ========================================================= */
+  new ResizeObserver(() => { if(state.data) scheduleRender(); }).observe(dom.plotRow);
+  window.addEventListener('resize', () => { if(state.data) scheduleRender(); });
+
+  /* =========================================================
+     EKSPORT (txt + png)
+     ========================================================= */
+  function downloadBlob(blob, filename){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function buildResultText(){
+    const p = state.params;
+    const M = computeM(p.phi);
+    const intersection = state.data ? findIntersection(state.data, M, p.a) : null;
+    const eps = state.data ? findStrainAtSu(state.data, p.su) : null;
+    return [
+      'RESULTAT FRA TANGENTTILPASNING',
+      '------------------------------',
+      '',
+      `a       = ${p.a.toFixed(3)}`,
+      `phi     = ${p.phi.toFixed(3)} grader`,
+      `M       = ${M.toFixed(5)}`,
+      intersection ? `p' (skj) = ${intersection.p.toFixed(3)} kPa` : "p' (skj) = –",
+      intersection ? `q (skj)  = ${intersection.q.toFixed(3)} kPa` : 'q (skj)  = –',
+      intersection && !isNaN(intersection.strain) ? `eps (skj) = ${intersection.strain.toFixed(3)} %` : 'eps (skj) = –',
+      `epsilon = ${eps !== null ? eps.toFixed(3) : '–'} %`,
+      `s_u     = ${p.su.toFixed(3)} kPa`,
+      ''
+    ].join('\n');
+  }
+
+  function exportCompositePng(){
+    const dpr = window.devicePixelRatio || 1;
+    const pad = 20, gap = 20;
+    const r1 = dom.canvas1.getBoundingClientRect();
+    const r2 = dom.canvas2.getBoundingClientRect();
+    const totalW = r1.width + r2.width + gap + pad * 2;
+    const totalH = Math.max(r1.height, r2.height) + pad * 2;
+
+    const composite = document.createElement('canvas');
+    composite.width = totalW * dpr;
+    composite.height = totalH * dpr;
+    const cctx = composite.getContext('2d');
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cctx.fillStyle = COLORS.bg;
+    cctx.fillRect(0, 0, totalW, totalH);
+    cctx.drawImage(dom.canvas1, pad, pad, r1.width, r1.height);
+    cctx.drawImage(dom.canvas2, pad + r1.width + gap, pad, r2.width, r2.height);
+
+    composite.toBlob(blob => downloadBlob(blob, 'triax_resultater.png'), 'image/png');
+  }
+
+  dom.saveBtn.addEventListener('click', () => {
+    if(!state.data) return;
+    downloadBlob(new Blob([buildResultText()], { type: 'text/plain;charset=utf-8' }), 'triax_resultater.txt');
+    exportCompositePng();
+  });
+
+})();
+</script>
+</body>
+</html>
