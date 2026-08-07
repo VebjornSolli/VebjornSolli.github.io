@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ødometerplotter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper: #f7f4ec;
+    --panel: #fffdf8;
+    --ink: #23261f;
+    --ink-soft: #5b5f52;
+    --line: #dcd6c4;
+    --grid: #e8e3d4;
+    --accent: #2c4a3e;
+    --accent-soft: #3f6a56;
+    --red: #c0392b;
+    --blue: #2c5f8a;
+    --green: #3f8148;
+    --black: #1a1a1a;
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/28px 28px,
+      var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:1500px;
+    margin:0 auto;
+    padding:20px 20px 40px;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+    padding-bottom:14px;
+    margin-bottom:18px;
+    border-bottom:2px solid var(--ink);
+  }
+  header .title-block{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+  }
+  header h1{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:0.02em;
+    margin:0;
+    text-transform:uppercase;
+  }
+  header .subtitle{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .toolbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .toolbar-divider{
+    width:1px;
+    align-self:stretch;
+    background:var(--line);
+    margin:0 8px;
+  }
+  .btn, label.btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:0.01em;
+    padding:10px 16px;
+    border-radius:var(--radius);
+    border:1.5px solid var(--ink);
+    background:var(--panel);
+    color:var(--ink);
+    cursor:pointer;
+    transition:background .12s ease, color .12s ease, transform .05s ease, box-shadow .12s ease;
+  }
+  .btn:hover{ background:var(--ink); color:var(--paper); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.primary{
+    background:var(--accent);
+    color:#fff;
+    border-color:var(--accent);
+    box-shadow:0 2px 0 0 var(--ink);
+    font-size:14px;
+    padding:12px 20px;
+  }
+  .btn.primary:hover{ background:var(--accent-soft); border-color:var(--accent-soft); }
+  .btn.primary:active{ box-shadow:none; transform:translateY(2px); }
+  .btn-icon{ font-size:15px; line-height:1; }
+  button.btn:disabled{ opacity:0.4; cursor:not-allowed; background:var(--panel); color:var(--ink); }
+  input[type="file"]{ display:none; }
+
+  .layout{
+    display:flex;
+    gap:20px;
+    align-items:flex-start;
+  }
+  .sidebar{
+    width:250px;
+    flex:0 0 250px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .panel{
+    background:var(--panel);
+    border:1.5px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 14px 16px;
+  }
+  .panel > .panel-title.no-caps{ text-transform:none; letter-spacing:0.02em; font-size:12px; }
+  .field-label sub, .plot-label sub, .panel-title sub{
+    font-size:0.7em;
+    vertical-align:sub;
+    line-height:0;
+  }
+  .panel > .panel-title{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:0 0 10px;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--line);
+  }
+  .field{ margin-bottom:12px; }
+  .field:last-child{ margin-bottom:0; }
+  .field-label{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:12.5px;
+    font-weight:600;
+    margin-bottom:5px;
+  }
+  .field-label .sym{ font-family:'IBM Plex Mono',monospace; }
+  .field-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  input[type="range"]{
+    -webkit-appearance:none;
+    flex:1;
+    height:4px;
+    border-radius:2px;
+    background:var(--line);
+    outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:14px; height:14px;
+    border-radius:50%;
+    background:var(--accent);
+    border:2px solid var(--panel);
+    box-shadow:0 0 0 1px var(--accent);
+    cursor:pointer;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:12px; height:12px;
+    border-radius:50%;
+    background:var(--accent);
+    border:2px solid var(--panel);
+    box-shadow:0 0 0 1px var(--accent);
+    cursor:pointer;
+  }
+  input[type="number"]{
+    width:64px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    padding:4px 6px;
+    border:1px solid var(--line);
+    border-radius:2px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input[type="number"]:focus, input[type="range"]:focus{
+    outline:2px solid var(--accent-soft);
+    outline-offset:1px;
+  }
+  .swatch{
+    display:inline-block;
+    width:14px; height:3px;
+    margin-right:6px;
+    vertical-align:middle;
+  }
+
+  .plot-area{
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .plot-panel{
+    background:var(--panel);
+    border:1.5px solid var(--line);
+    border-radius:var(--radius);
+    padding:10px 14px 14px;
+  }
+  .plot-panel .plot-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    margin-bottom:2px;
+  }
+  canvas{ display:block; width:100%; }
+  #plot1{ height:420px; }
+  #plot2{ height:230px; }
+
+  .empty-state{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    height:420px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    text-align:center;
+    border:1.5px dashed var(--line);
+    border-radius:var(--radius);
+    background:var(--panel);
+  }
+
+  footer{
+    margin-top:22px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    text-align:right;
+  }
+
+  @media (max-width: 880px){
+    .layout{ flex-direction:column; }
+    .sidebar{ width:100%; flex:1; flex-direction:row; flex-wrap:wrap; }
+    .sidebar .panel{ flex:1 1 220px; }
+  }
+</style>
+</head>
+<body>
+<!-- forces the browser to fetch the glyph ranges (Greek incl.) for these fonts before we draw them on <canvas> -->
+<div aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;visibility:hidden;">
+  <span style="font-family:'IBM Plex Mono',monospace;">σεΩ'₀ᵣcavM</span>
+  <span style="font-family:'Inter',sans-serif;">σεΩ'₀ᵣcavM</span>
+</div>
+<div class="app">
+
+  <header>
+    <div class="title-block">
+      <h1>Ødometerplotter</h1>
+      <span class="subtitle">ødometerforsøk · σ'<sub>av</sub>–ε<sub>a</sub>–c<sub>v</sub></span>
+    </div>
+    <div class="toolbar">
+      <label class="btn primary btn-upload" for="fileInput">
+        <span class="btn-icon">⇪</span> Velg Excel-fil
+      </label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <span class="toolbar-divider"></span>
+      <button class="btn" id="saveBtn" disabled>Lagre resultat</button>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <aside class="sidebar">
+
+      <div class="panel">
+        <p class="panel-title">Referanselinjer</p>
+
+        <div class="field">
+          <div class="field-label"><span class="sym">p₀</span></div>
+          <div class="field-row">
+            <input type="range" id="p0Slider" min="0" max="1000" step="0.1" value="0">
+            <input type="number" id="p0Input" value="0" step="1">
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span class="sym">p<sub>c</sub></span></div>
+          <div class="field-row">
+            <input type="range" id="pcSlider" min="0" max="1000" step="0.1" value="0">
+            <input type="number" id="pcInput" value="0" step="1">
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span class="sym">M</span></div>
+          <div class="field-row">
+            <input type="range" id="MSlider" min="0" max="25" step="0.05" value="0">
+            <input type="number" id="MInput" value="0" step="0.1">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p class="panel-title no-caps">σ<sub>r</sub> – m linje</p>
+
+        <div class="field">
+          <div class="field-label"><span class="sym">σ<sub>r</sub></span></div>
+          <div class="field-row">
+            <input type="number" id="sigmaRInput" value="0" step="1" style="width:100%;">
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span class="sym">m</span> <span style="font-weight:400;color:var(--ink-soft);font-size:11px;">(modultall)</span></div>
+          <div class="field-row">
+            <input type="range" id="mSlider" min="0" max="50" step="0.1" value="15">
+            <input type="number" id="mInput" value="15" step="0.1">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p class="panel-title">Akser</p>
+
+        <div class="field">
+          <div class="field-label"><span class="sym">Maks σ'<sub>av</sub></span></div>
+          <div class="field-row">
+            <input type="range" id="xmaxSlider" min="0" max="1000" step="1" value="1000">
+            <input type="number" id="xmaxInput" value="1000" step="1">
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span class="sym">Maks c<sub>v</sub></span></div>
+          <div class="field-row">
+            <input type="number" id="cvMaxInput" value="100" step="1" style="width:100%;">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p class="panel-title">Tegnforklaring</p>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
+          <div><span class="swatch" style="background:var(--red);"></span>ε<sub>a</sub></div>
+          <div><span class="swatch" style="background:var(--blue);"></span>M-kurve</div>
+          <div><span class="swatch" style="background:var(--green);border-top:2px dashed var(--green);height:0;"></span>p₀</div>
+          <div><span class="swatch" style="background:var(--black);border-top:2px dashed var(--black);height:0;"></span>p<sub>c</sub></div>
+          <div><span class="swatch" style="background:var(--black);"></span>M / σ<sub>r</sub>–m</div>
+        </div>
+      </div>
+
+    </aside>
+
+    <main class="plot-area">
+      <div id="emptyState" class="empty-state">
+        <div>Ingen data lastet inn ennå</div>
+        <div>Klikk «Velg Excel-fil» for å starte</div>
+      </div>
+
+      <div class="plot-panel" id="plot1Panel" style="display:none;">
+        <div class="plot-label">εa &amp; M mot σ'av</div>
+        <canvas id="plot1"></canvas>
+      </div>
+
+      <div class="plot-panel" id="plot2Panel" style="display:none;">
+        <div class="plot-label">c<sub>v</sub> mot σ'<sub>av</sub></div>
+        <canvas id="plot2"></canvas>
+      </div>
+    </main>
+
+  </div>
+
+  <footer>ødometerplotter · kjører lokalt i nettleseren, ingen data sendes noe sted</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================
+     KONSTANTER
+     ========================================================= */
+  const COLORS = {
+    epsilon: '#c0392b',
+    M:       '#2c5f8a',
+    p0:      '#3f8148',
+    pc:      '#1a1a1a',
+    tangent: '#1a1a1a',
+    cv:      '#3f8148',
+    grid:    '#e3ded0',
+    axis:    '#23261f',
+    tick:    '#5b5f52',
+    zero:    '#b9b3a0',
+    bg:      '#fffdf8'
+  };
+  const FONT_UI   = 'Inter, Arial, sans-serif';
+  const FONT_MONO = '"IBM Plex Mono", monospace';
+
+  /* =========================================================
+     TILSTAND
+     Ett sted for alt som styrer hva som tegnes.
+     ========================================================= */
+  const state = {
+    data: null,              // [{sigma, epsilon, M, cv}, ...]
+    ranges: {                // grenser hentet fra datasettet
+      sigmaMax: 1000,
+      epsilonMax: 10,
+      MDataMax: 25,
+      cvDataMax: 100
+    },
+    params: {                // det brukeren styrer med kontrollene
+      p0: 0, pc: 0, M: 0,
+      sigmaR: 0, m: 15,
+      xmax: 1000, cvMax: 100
+    }
+  };
+
+  /* =========================================================
+     DOM
+     ========================================================= */
+  const $ = id => document.getElementById(id);
+  const dom = {
+    fileInput:  $('fileInput'),
+    saveBtn:    $('saveBtn'),
+    emptyState: $('emptyState'),
+    plot1Panel: $('plot1Panel'),
+    plot2Panel: $('plot2Panel'),
+    plotArea:   document.querySelector('.plot-area'),
+    canvas1:    $('plot1'),
+    canvas2:    $('plot2'),
+    controls: {
+      p0:     { slider: $('p0Slider'),    input: $('p0Input') },
+      pc:     { slider: $('pcSlider'),    input: $('pcInput') },
+      M:      { slider: $('MSlider'),     input: $('MInput') },
+      sigmaR: { slider: null,             input: $('sigmaRInput') },
+      m:      { slider: $('mSlider'),     input: $('mInput') },
+      xmax:   { slider: $('xmaxSlider'),  input: $('xmaxInput') },
+      cvMax:  { slider: null,             input: $('cvMaxInput') }
+    }
+  };
+
+  /* =========================================================
+     SMÅ MATTE-/SKALAHJELPERE
+     ========================================================= */
+
+  // Lager en funksjon som mapper en verdi fra [d0,d1] til [r0,r1].
+  function linearScale(d0, d1, r0, r1){
+    const span = (d1 - d0) || 1;
+    return v => r0 + ((v - d0) / span) * (r1 - r0);
+  }
+
+  function niceNum(range, round){
+    if(range === 0) return 1;
+    const exponent = Math.floor(Math.log10(range));
+    const fraction = range / Math.pow(10, exponent);
+    let niceFraction;
+    if(round){
+      if(fraction < 1.5) niceFraction = 1;
+      else if(fraction < 3) niceFraction = 2;
+      else if(fraction < 7) niceFraction = 5;
+      else niceFraction = 10;
+    } else {
+      if(fraction <= 1) niceFraction = 1;
+      else if(fraction <= 2) niceFraction = 2;
+      else if(fraction <= 5) niceFraction = 5;
+      else niceFraction = 10;
+    }
+    return niceFraction * Math.pow(10, exponent);
+  }
+
+  function niceTicks(min, max, maxTicks){
+    maxTicks = maxTicks || 6;
+    if(max <= min) max = min + 1;
+    const range = niceNum(max - min, false);
+    const step = niceNum(range / (maxTicks - 1), true);
+    const niceMin = Math.floor(min / step) * step;
+    const niceMax = Math.ceil(max / step) * step;
+    const ticks = [];
+    for(let v = niceMin; v <= niceMax + step / 1000; v += step){
+      ticks.push(Math.round(v / step) * step);
+    }
+    return ticks;
+  }
+
+  function fmt(v){
+    if(Math.abs(v) < 0.0001) return '0';
+    if(Math.abs(v) >= 100) return v.toFixed(0);
+    if(Math.abs(v) >= 10) return v.toFixed(1);
+    return v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
+  /* =========================================================
+     TEKST MED SUBSCRIPT PÅ CANVAS
+     segments: [[tekst, erSubscript], ...]
+     ========================================================= */
+  function drawLabel(ctx, segments, x, y, align, fontFamily, weight){
+    weight = weight || '600';
+    fontFamily = fontFamily || FONT_UI;
+    const baseSize = 12, subSize = 9;
+    const baseFont = weight + ' ' + baseSize + 'px ' + fontFamily;
+    const subFont  = weight + ' ' + subSize + 'px ' + fontFamily;
+
+    let total = 0;
+    segments.forEach(([t, sub]) => {
+      ctx.font = sub ? subFont : baseFont;
+      total += ctx.measureText(t).width;
+    });
+
+    let startX = x;
+    if(align === 'center') startX = x - total / 2;
+    else if(align === 'right') startX = x - total;
+
+    const prevAlign = ctx.textAlign, prevBaseline = ctx.textBaseline;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    let cx = startX;
+    segments.forEach(([t, sub]) => {
+      ctx.font = sub ? subFont : baseFont;
+      ctx.fillText(t, cx, sub ? y + 3 : y);
+      cx += ctx.measureText(t).width;
+    });
+    ctx.textAlign = prevAlign;
+    ctx.textBaseline = prevBaseline;
+  }
+
+  /* =========================================================
+     CANVAS-OPPSETT
+     ========================================================= */
+  function prepareCanvas(canvas, cssHeight){
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.getBoundingClientRect().width || canvas.parentElement.clientWidth;
+    canvas.style.height = cssHeight + 'px';
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(cssHeight * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, cssHeight);
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, w, cssHeight);
+    return { ctx, w, h: cssHeight };
+  }
+
+  /* =========================================================
+     GJENBRUKBARE AKSE-/RUTENETT-TEGNERE
+     Brukes av begge plottene så logikken kun finnes ett sted.
+     ========================================================= */
+
+  // Vertikale rutenettlinjer + tall langs x-aksen (under plottet).
+  function drawXGrid(ctx, ticks, xMin, xMax, xToPx, top, bottom){
+    ctx.font = '11px ' + FONT_MONO;
+    ctx.fillStyle = COLORS.tick;
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 1;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ticks.forEach(t => {
+      if(t < xMin || t > xMax) return;
+      const px = xToPx(t);
+      ctx.beginPath();
+      ctx.moveTo(px, top); ctx.lineTo(px, bottom);
+      ctx.stroke();
+      ctx.fillText(fmt(t), px, bottom + 6);
+    });
+  }
+
+  // Horisontale rutenettlinjer + tall langs en venstre y-akse.
+  function drawYGridLeft(ctx, ticks, yMin, yMax, yToPx, left, right, labelX){
+    ctx.font = '11px ' + FONT_MONO;
+    ctx.fillStyle = COLORS.tick;
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 1;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ticks.forEach(t => {
+      if(t < yMin || t > yMax) return;
+      const py = yToPx(t);
+      ctx.beginPath();
+      ctx.moveTo(left, py); ctx.lineTo(right, py);
+      ctx.stroke();
+      ctx.fillText(fmt(t), labelX, py);
+    });
+  }
+
+  // Kun tall (ingen rutenett) langs en høyre sekundærakse.
+  function drawYTicksRight(ctx, ticks, yMin, yMax, yToPx, labelX){
+    ctx.font = '11px ' + FONT_MONO;
+    ctx.fillStyle = COLORS.tick;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ticks.forEach(t => {
+      if(t < yMin || t > yMax) return;
+      ctx.fillText(fmt(t), labelX, yToPx(t));
+    });
+  }
+
+  function drawFrame(ctx, x, y, w, h){
+    ctx.strokeStyle = COLORS.axis;
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(x, y, w, h);
+  }
+
+  // Tegner en datakurve (polyline) innenfor et clip-område.
+  function drawSeries(ctx, points, color, lineWidth){
+    if(!points.length) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    points.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
+    ctx.stroke();
+  }
+
+  function withClip(ctx, x, y, w, h, fn){
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    fn();
+    ctx.restore();
+  }
+
+  /* =========================================================
+     PLOT 1: εa (venstre, økende nedover) & M (høyre) mot σ'av
+     ========================================================= */
+  function renderPlot1(){
+    const { ctx, w, h } = prepareCanvas(dom.canvas1, 420);
+    const marginL = 56, marginR = 60, marginT = 18, marginB = 42;
+    const plotW = Math.max(10, w - marginL - marginR);
+    const plotH = Math.max(10, h - marginT - marginB);
+    const top = marginT, bottom = marginT + plotH, left = marginL, right = marginL + plotW;
+
+    const { params, ranges } = state;
+    const xMax = Math.max(params.xmax, 1);
+    const epsMax = Math.max(ranges.epsilonMax, 0.001);
+    const MAxisMax = Math.max(ranges.MDataMax * 1.15, params.M * 1.15, 1);
+
+    const xToPx   = linearScale(0, xMax, left, right);
+    const epsToPx = linearScale(0, epsMax, top, bottom);              // 0 øverst, øker nedover
+    const MToPx   = linearScale(0, MAxisMax, bottom, top);            // 0 nederst, øker oppover
+
+    const xTicks   = niceTicks(0, xMax, 7);
+    const epsTicks = niceTicks(0, epsMax, 6);
+    const MTicks   = niceTicks(0, MAxisMax, 6);
+
+    drawXGrid(ctx, xTicks, 0, xMax, xToPx, top, bottom);
+    drawYGridLeft(ctx, epsTicks, 0, epsMax, epsToPx, left, right, left - 8);
+    drawYTicksRight(ctx, MTicks, 0, MAxisMax, MToPx, right + 8);
+
+    // nullinje for epsilon
+    ctx.strokeStyle = COLORS.zero;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(left, epsToPx(0)); ctx.lineTo(right, epsToPx(0));
+    ctx.stroke();
+
+    drawFrame(ctx, left, top, plotW, plotH);
+
+    withClip(ctx, left, top, plotW, plotH, () => {
+      if(state.data && state.data.length){
+        drawSeries(
+          ctx,
+          state.data.filter(d => !isNaN(d.sigma) && !isNaN(d.epsilon))
+                     .map(d => [xToPx(d.sigma), epsToPx(d.epsilon)]),
+          COLORS.epsilon, 2
+        );
+        drawSeries(
+          ctx,
+          state.data.filter(d => !isNaN(d.sigma) && !isNaN(d.M) && d.M > 0)
+                     .map(d => [xToPx(d.sigma), MToPx(d.M)]),
+          COLORS.M, 2
+        );
+      }
+
+      // p0: full høyde, grønn stiplet
+      ctx.strokeStyle = COLORS.p0; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(xToPx(params.p0), top); ctx.lineTo(xToPx(params.p0), bottom);
+      ctx.stroke();
+
+      // pc: full høyde, sort stiplet
+      ctx.strokeStyle = COLORS.pc; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(xToPx(params.pc), top); ctx.lineTo(xToPx(params.pc), bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // M-linje: horisontal fra 0 til pc, i høyden M (høyre akse)
+      ctx.strokeStyle = COLORS.pc; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(xToPx(0), MToPx(params.M)); ctx.lineTo(xToPx(params.pc), MToPx(params.M));
+      ctx.stroke();
+
+      // σr–m tangentlinje (høyre akse). m er modultallet:
+      // M[MPa] = m * (σ'-σr)[kPa] / 1000, dvs. M og σ' i samme enhet før konvertering til MPa.
+      const y0 = params.m * (0 - params.sigmaR) / 1000;
+      const y1 = params.m * (xMax - params.sigmaR) / 1000;
+      ctx.strokeStyle = COLORS.tangent; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(xToPx(0), MToPx(y0)); ctx.lineTo(xToPx(xMax), MToPx(y1));
+      ctx.stroke();
+    });
+
+    ctx.fillStyle = COLORS.axis;
+    drawLabel(ctx, [["σ'", 0], ['av', 1], [' [kPa]', 0]], left + plotW / 2, h - 4, 'center');
+
+    ctx.save();
+    ctx.translate(14, top + plotH / 2); ctx.rotate(-Math.PI / 2);
+    drawLabel(ctx, [['ε', 0], ['a', 1], [' [%]', 0]], 0, 0, 'center');
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(w - 8, top + plotH / 2); ctx.rotate(Math.PI / 2);
+    drawLabel(ctx, [['M [MPa]', 0]], 0, 0, 'center');
+    ctx.restore();
+  }
+
+  /* =========================================================
+     PLOT 2: c_v mot σ'av
+     ========================================================= */
+  function renderPlot2(){
+    const { ctx, w, h } = prepareCanvas(dom.canvas2, 230);
+    const marginL = 56, marginR = 20, marginT = 14, marginB = 38;
+    const plotW = Math.max(10, w - marginL - marginR);
+    const plotH = Math.max(10, h - marginT - marginB);
+    const top = marginT, bottom = marginT + plotH, left = marginL, right = marginL + plotW;
+
+    const { params } = state;
+    const sigmaVals = (state.data || []).map(d => d.sigma).filter(v => !isNaN(v));
+    const xMax = Math.max(sigmaVals.length ? Math.max(...sigmaVals) : state.ranges.sigmaMax, 1);
+    const cvMax = Math.max(params.cvMax, 1);
+
+    const xToPx  = linearScale(0, xMax, left, right);
+    const cvToPx = linearScale(0, cvMax, bottom, top);
+
+    const xTicks  = niceTicks(0, xMax, 7);
+    const cvTicks = niceTicks(0, cvMax, 5);
+
+    drawXGrid(ctx, xTicks, 0, xMax, xToPx, top, bottom);
+    drawYGridLeft(ctx, cvTicks, 0, cvMax, cvToPx, left, right, left - 8);
+    drawFrame(ctx, left, top, plotW, plotH);
+
+    withClip(ctx, left, top, plotW, plotH, () => {
+      if(state.data && state.data.length){
+        drawSeries(
+          ctx,
+          state.data.filter(d => !isNaN(d.sigma) && !isNaN(d.cv))
+                     .map(d => [xToPx(d.sigma), cvToPx(d.cv)]),
+          COLORS.cv, 1.7
+        );
+      }
+    });
+
+    ctx.fillStyle = COLORS.axis;
+    drawLabel(ctx, [["σ'", 0], ['av', 1]], left + plotW / 2, h - 4, 'center');
+
+    ctx.save();
+    ctx.translate(14, top + plotH / 2); ctx.rotate(-Math.PI / 2);
+    drawLabel(ctx, [['c', 0], ['v', 1]], 0, 0, 'center');
+    ctx.restore();
+  }
+
+  function renderAll(){
+    if(!state.data) return;
+    renderPlot1();
+    renderPlot2();
+  }
+
+  // Samler flere redraw-kall (slider-dra, resize) til én pr. animasjonsramme.
+  let renderScheduled = false;
+  function scheduleRender(){
+    if(renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(() => { renderScheduled = false; renderAll(); });
+  }
+
+  /* =========================================================
+     PARAMETER-BINDING (slider + tallfelt -> state.params)
+     ========================================================= */
+  function bindControl(key, { slider, input }){
+    function apply(value){
+      if(isNaN(value)) return;
+      state.params[key] = value;
+      if(slider){
+        if(value > parseFloat(slider.max)) slider.max = value;
+        slider.value = value;
+      }
+      input.value = value;
+      scheduleRender();
+    }
+    if(slider) slider.addEventListener('input', () => apply(parseFloat(slider.value)));
+    input.addEventListener('input', () => apply(parseFloat(input.value)));
+    input.addEventListener('change', () => apply(parseFloat(input.value)));
+  }
+  Object.keys(dom.controls).forEach(key => bindControl(key, dom.controls[key]));
+
+  /* =========================================================
+     INNLESING AV EXCEL-FIL
+     ========================================================= */
+  function normalizeKey(k){
+    return String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function toNum(v){
+    if(v === null || v === undefined || v === '') return NaN;
+    return typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.'));
+  }
+
+  function detectColumns(headerKeys){
+    const cols = { epsilon: null, sigma: null, M: null, cv: null };
+    headerKeys.forEach(k => {
+      const nk = normalizeKey(k);
+      if(nk.includes('epsilon')) cols.epsilon = k;
+      else if(nk.includes('sigma')) cols.sigma = k;
+      else if(nk === 'm') cols.M = k;
+      else if(nk === 'cv' || nk.includes('cv')) cols.cv = k;
+    });
+    return cols;
+  }
+
+  function parseRows(rows){
+    if(!rows.length) throw new Error('Fant ingen rader i filen.');
+    const cols = detectColumns(Object.keys(rows[0]));
+    if(!cols.epsilon || !cols.sigma){
+      throw new Error('Fant ikke kolonnene "Epsilon_a" og/eller "sigma\'_av" i filen.');
+    }
+    const data = rows.map(r => ({
+      sigma:   toNum(r[cols.sigma]),
+      epsilon: toNum(r[cols.epsilon]),
+      M:       cols.M  ? toNum(r[cols.M])  : NaN,
+      cv:      cols.cv ? toNum(r[cols.cv]) : NaN
+    }));
+
+    const only = (arr, pred) => arr.filter(v => !isNaN(v) && (!pred || pred(v)));
+    const sigmaVals   = only(data.map(d => d.sigma));
+    const epsilonVals = only(data.map(d => d.epsilon));
+    const MVals       = only(data.map(d => d.M), v => v > 0);
+    const cvVals      = only(data.map(d => d.cv));
+
+    return {
+      data,
+      ranges: {
+        sigmaMax:   sigmaVals.length ? Math.max(...sigmaVals) : 1000,
+        epsilonMax: epsilonVals.length ? Math.max(...epsilonVals) : 10,
+        MDataMax:   MVals.length ? Math.max(...MVals) : 25,
+        cvDataMax:  cvVals.length ? Math.max(...cvVals) : 100
+      }
+    };
+  }
+
+  function applyLoadedData(parsed){
+    state.data = parsed.data;
+    state.ranges = parsed.ranges;
+
+    const c = dom.controls;
+    c.xmax.slider.max = state.ranges.sigmaMax;
+    c.xmax.slider.value = state.ranges.sigmaMax;
+    c.xmax.input.value = state.ranges.sigmaMax;
+    state.params.xmax = state.ranges.sigmaMax;
+
+    c.p0.slider.max = state.ranges.sigmaMax;
+    c.pc.slider.max = state.ranges.sigmaMax;
+    c.M.slider.max = state.ranges.MDataMax || 25;
+
+    const cvDefault = Math.ceil(state.ranges.cvDataMax * 1.1) || 100;
+    c.cvMax.input.value = cvDefault;
+    state.params.cvMax = cvDefault;
+
+    dom.emptyState.style.display = 'none';
+    dom.plot1Panel.style.display = '';
+    dom.plot2Panel.style.display = '';
+    dom.saveBtn.disabled = false;
+
+    const draw = () => renderAll();
+    if(document.fonts && document.fonts.ready){
+      document.fonts.ready.then(draw).catch(draw);
+    } else {
+      draw();
+    }
+  }
+
+  dom.fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try{
+        const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+        applyLoadedData(parseRows(rows));
+      }catch(err){
+        alert('Klarte ikke å lese Excel-filen: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  /* =========================================================
+     RESIZE
+     ========================================================= */
+  new ResizeObserver(() => { if(state.data) scheduleRender(); }).observe(dom.plotArea);
+  window.addEventListener('resize', () => { if(state.data) scheduleRender(); });
+
+  /* =========================================================
+     EKSPORT (txt + png)
+     ========================================================= */
+  function downloadBlob(blob, filename){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function buildResultText(){
+    const p = state.params;
+    return [
+      'ØDOMETERRESULTATER',
+      '------------------',
+      '',
+      `p0      = ${p.p0.toFixed(3)}`,
+      `pc      = ${p.pc.toFixed(3)}`,
+      `M       = ${p.M.toFixed(3)}`,
+      `sigma_r = ${p.sigmaR.toFixed(3)}`,
+      `m       = ${p.m.toFixed(3)}`,
+      ''
+    ].join('\n');
+  }
+
+  function exportCompositePng(onDone){
+    const dpr = window.devicePixelRatio || 1;
+    const pad = 20;
+    const r1 = dom.canvas1.getBoundingClientRect();
+    const r2 = dom.canvas2.getBoundingClientRect();
+    const totalW = Math.max(r1.width, r2.width) + pad * 2;
+    const totalH = r1.height + r2.height + pad * 3;
+
+    const composite = document.createElement('canvas');
+    composite.width = totalW * dpr;
+    composite.height = totalH * dpr;
+    const cctx = composite.getContext('2d');
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cctx.fillStyle = COLORS.bg;
+    cctx.fillRect(0, 0, totalW, totalH);
+    cctx.drawImage(dom.canvas1, pad, pad, r1.width, r1.height);
+    cctx.drawImage(dom.canvas2, pad, pad * 2 + r1.height, r2.width, r2.height);
+
+    composite.toBlob(blob => { downloadBlob(blob, 'odometerresultat.png'); onDone && onDone(); }, 'image/png');
+  }
+
+  dom.saveBtn.addEventListener('click', () => {
+    if(!state.data) return;
+    downloadBlob(new Blob([buildResultText()], { type: 'text/plain;charset=utf-8' }), 'odometerresultat.txt');
+    exportCompositePng();
+  });
+
+})();
+
+</script>
+</body>
+</html>
