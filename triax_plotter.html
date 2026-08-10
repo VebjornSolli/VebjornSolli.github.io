@@ -518,27 +518,97 @@
     return (6 * Math.sin(phiRad)) / (3 - Math.sin(phiRad));
   }
 
-  // Finner datapunktet på én prøves p'-q-kurve som ligger nærmest tangentlinjen.
+  // Finner hvor p'-q-kurven faktisk krysser tangentlinjen (fortegnsskifte i
+  // q - M*(p'+a) mellom to påfølgende punkter), og interpolerer det nøyaktige
+  // krysningspunktet. Kurven kan krysse linjen flere ganger (f.eks. hvis
+  // spenningsbanen svinger); da velges kryssingen med lavest tøyning, siden
+  // det er det første (og geoteknisk relevante) bruddpunktet.
+  // Hvis linjen ikke krysser kurven i det hele tatt, faller vi tilbake til
+  // det punktet på kurven som ligger nærmest linjen.
   function findIntersection(data, M, a){
-    let bestIdx = -1, bestDiff = Infinity;
-    data.forEach((d, i) => {
-      if(isNaN(d.p) || isNaN(d.q)) return;
-      const qTangent = M * (d.p + a);
-      const diff = Math.abs(d.q - qTangent);
-      if(diff < bestDiff){ bestDiff = diff; bestIdx = i; }
+    let pts = data.filter(d => !isNaN(d.p) && !isNaN(d.q));
+    if(!pts.length) return null;
+
+    // Sorter etter tøyning når alle punkter har den, så "laveste tøyning"
+    // stemmer selv om radene i filen ikke skulle ligge i kronologisk rekkefølge.
+    if(pts.every(d => !isNaN(d.strain))){
+      pts = pts.slice().sort((x, y) => x.strain - y.strain);
+    }
+
+    const diffAt = d => d.q - M * (d.p + a);
+    const crossings = [];
+
+    for(let i = 0; i < pts.length; i++){
+      const d1 = pts[i], diff1 = diffAt(d1);
+      if(diff1 === 0){
+        crossings.push({ p: d1.p, q: d1.q, strain: d1.strain });
+        continue;
+      }
+      if(i === pts.length - 1) continue;
+      const d2 = pts[i + 1], diff2 = diffAt(d2);
+      if((diff1 < 0 && diff2 > 0) || (diff1 > 0 && diff2 < 0)){
+        const t = diff1 / (diff1 - diff2);
+        crossings.push({
+          p: d1.p + t * (d2.p - d1.p),
+          q: d1.q + t * (d2.q - d1.q),
+          strain: (!isNaN(d1.strain) && !isNaN(d2.strain)) ? d1.strain + t * (d2.strain - d1.strain) : NaN
+        });
+      }
+    }
+
+    if(crossings.length){
+      const withStrain = crossings.filter(c => !isNaN(c.strain));
+      if(withStrain.length){
+        withStrain.sort((x, y) => x.strain - y.strain);
+        return withStrain[0];
+      }
+      return crossings[0]; // ingen tøyningsdata: bruk første kryssing i rekkefølgen
+    }
+
+    // ingen faktisk kryssing funnet -> nærmeste punkt på kurven
+    let best = null, bestDiff = Infinity;
+    pts.forEach(d => {
+      const diff = Math.abs(diffAt(d));
+      if(diff < bestDiff){ bestDiff = diff; best = d; }
     });
-    return bestIdx >= 0 ? data[bestIdx] : null;
+    return best;
   }
 
-  // Finner tøyningen ved det punktet der tau_max er nærmest s_u, for én prøve.
+  // Finner tøyningen der τmax-kurven faktisk krysser s_u-linjen (samme prinsipp
+  // som for p'-q-kurven): hvis kurven krysser flere ganger, velges kryssingen
+  // med lavest tøyning - altså der skjærstyrken s_u først nås. Faller tilbake
+  // til nærmeste punkt hvis linjen ikke krysser kurven i det hele tatt.
   function findStrainAtSu(data, su){
-    let bestIdx = -1, bestDiff = Infinity;
-    data.forEach((d, i) => {
-      if(isNaN(d.tauMax) || isNaN(d.strain)) return;
-      const diff = Math.abs(d.tauMax - su);
-      if(diff < bestDiff){ bestDiff = diff; bestIdx = i; }
+    let pts = data.filter(d => !isNaN(d.tauMax) && !isNaN(d.strain));
+    if(!pts.length) return null;
+    pts = pts.slice().sort((a, b) => a.strain - b.strain);
+
+    const diffAt = d => d.tauMax - su;
+    const crossings = [];
+
+    for(let i = 0; i < pts.length; i++){
+      const d1 = pts[i], diff1 = diffAt(d1);
+      if(diff1 === 0){ crossings.push(d1.strain); continue; }
+      if(i === pts.length - 1) continue;
+      const d2 = pts[i + 1], diff2 = diffAt(d2);
+      if((diff1 < 0 && diff2 > 0) || (diff1 > 0 && diff2 < 0)){
+        const t = diff1 / (diff1 - diff2);
+        crossings.push(d1.strain + t * (d2.strain - d1.strain));
+      }
+    }
+
+    if(crossings.length){
+      crossings.sort((a, b) => a - b);
+      return crossings[0];
+    }
+
+    // ingen faktisk kryssing -> nærmeste punkt på kurven
+    let best = null, bestDiff = Infinity;
+    pts.forEach(d => {
+      const diff = Math.abs(diffAt(d));
+      if(diff < bestDiff){ bestDiff = diff; best = d.strain; }
     });
-    return bestIdx >= 0 ? data[bestIdx].strain : null;
+    return best;
   }
 
   function combinedRanges(){
@@ -610,8 +680,15 @@
       ctx.fill();
 
       // skjæringspunkt kurve/tangent per prøve
+      // (try/catch per fil, slik at ett datasett med uventet innhold ikke
+      // stopper beregningen - og dermed resultattabellen - for de andre filene)
       state.series.forEach(s => {
-        const inter = findIntersection(s.data, M, params.a);
+        let inter = null;
+        try{
+          inter = findIntersection(s.data, M, params.a);
+        }catch(err){
+          console.warn('Klarte ikke å finne skjæringspunkt for "' + s.name + '":', err);
+        }
         intersections.push({ series: s, point: inter });
         if(inter){
           const px = xToPx(inter.p), py = yToPx(inter.q);
@@ -679,7 +756,12 @@
       ctx.setLineDash([]);
 
       state.series.forEach(s => {
-        const eps = findStrainAtSu(s.data, params.su);
+        let eps = null;
+        try{
+          eps = findStrainAtSu(s.data, params.su);
+        }catch(err){
+          console.warn('Klarte ikke å finne s_u-kryssing for "' + s.name + '":', err);
+        }
         strainAtSu.push({ series: s, eps });
         if(eps !== null){
           const px = xToPx(eps), py = yToPx(params.su);
@@ -750,8 +832,23 @@
 
   function renderAll(){
     if(!state.series.length) return;
-    const { M, intersections } = renderPlot1();
-    const { strainAtSu } = renderPlot2();
+
+    let M = computeM(state.params.phi), intersections = [], strainAtSu = [];
+
+    try{
+      const r1 = renderPlot1();
+      M = r1.M; intersections = r1.intersections;
+    }catch(err){
+      console.warn('Klarte ikke å tegne p\'-q-plottet:', err);
+    }
+
+    try{
+      const r2 = renderPlot2();
+      strainAtSu = r2.strainAtSu;
+    }catch(err){
+      console.warn('Klarte ikke å tegne τmax-tøyning-plottet:', err);
+    }
+
     updateResultsPanel(M, intersections, strainAtSu);
   }
 
