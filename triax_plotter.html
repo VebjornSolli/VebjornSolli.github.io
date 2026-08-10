@@ -14,7 +14,8 @@
     --ink: #23261f;
     --ink-soft: #5b5f52;
     --line: #dcd6c4;
-    --grid: #e8e3d4;
+    --grid: #d9d2bc;
+    --grid-minor: #efebe0;
     --accent: #2c4a3e;
     --accent-soft: #3f6a56;
     --blue: #2c5f8a;
@@ -27,36 +28,22 @@
   body{
     margin:0;
     background:
-      linear-gradient(var(--grid) 1px, transparent 1px) 0 0/28px 28px,
-      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(var(--grid-minor) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px) 0 0/28px 28px,
       var(--paper);
     color:var(--ink);
     font-family:'Inter',system-ui,sans-serif;
     -webkit-font-smoothing:antialiased;
   }
-  .app{
-    max-width:1600px;
-    margin:0 auto;
-    padding:20px 20px 40px;
-  }
+  .app{ max-width:1600px; margin:0 auto; padding:20px 20px 40px; }
   header{
-    display:flex;
-    align-items:baseline;
-    justify-content:space-between;
-    flex-wrap:wrap;
-    gap:10px;
-    padding-bottom:14px;
-    margin-bottom:18px;
-    border-bottom:2px solid var(--ink);
+    display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    padding-bottom:14px; margin-bottom:18px; border-bottom:2px solid var(--ink);
   }
   header .title-block{ display:flex; align-items:baseline; gap:12px; }
   header h1{
-    font-family:'IBM Plex Mono',monospace;
-    font-size:22px;
-    font-weight:600;
-    letter-spacing:0.02em;
-    margin:0;
-    text-transform:uppercase;
+    font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600;
+    letter-spacing:0.02em; margin:0; text-transform:uppercase;
   }
   header .subtitle{ font-size:12.5px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; }
 
@@ -77,20 +64,24 @@
   }
   .btn.primary:hover{ background:var(--accent-soft); border-color:var(--accent-soft); }
   .btn.primary:active{ box-shadow:none; transform:translateY(2px); }
+  .btn.small{ padding:6px 10px; font-size:12px; }
   .btn-icon{ font-size:15px; line-height:1; }
   button.btn:disabled{ opacity:0.4; cursor:not-allowed; background:var(--panel); color:var(--ink); }
   input[type="file"]{ display:none; }
 
   .layout{ display:flex; gap:20px; align-items:flex-start; }
-  .sidebar{ width:260px; flex:0 0 260px; display:flex; flex-direction:column; gap:14px; }
+  .sidebar{ width:280px; flex:0 0 280px; display:flex; flex-direction:column; gap:14px; }
   .panel{ background:var(--panel); border:1.5px solid var(--line); border-radius:var(--radius); padding:14px 14px 16px; }
   .panel > .panel-title{
+    display:flex; align-items:center; justify-content:space-between;
     font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600;
     letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft);
     margin:0 0 10px; padding-bottom:8px; border-bottom:1px solid var(--line);
   }
   .panel > .panel-title.no-caps{ text-transform:none; letter-spacing:0.02em; font-size:12px; }
-  .field-label sub, .plot-label sub, .panel-title sub, .readout sub{ font-size:0.72em; vertical-align:sub; line-height:0; }
+  .field-label sub, .plot-label sub, .panel-title sub, .readout sub, .file-row sub, th sub{
+    font-size:0.72em; vertical-align:sub; line-height:0;
+  }
 
   .field{ margin-bottom:12px; }
   .field:last-child{ margin-bottom:0; }
@@ -122,6 +113,33 @@
 
   .swatch{ display:inline-block; width:14px; height:3px; margin-right:6px; vertical-align:middle; }
   .swatch.dot{ width:8px; height:8px; border-radius:50%; margin-right:7px; }
+
+  .file-empty{ font-size:12px; color:var(--ink-soft); font-style:italic; }
+  .file-row{
+    display:flex; align-items:center; gap:8px; padding:5px 0;
+    border-bottom:1px dashed var(--line); font-size:12px;
+  }
+  .file-row:last-child{ border-bottom:none; }
+  .file-row .swatch.dot{ flex:0 0 auto; width:10px; height:10px; }
+  .file-row .fname{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-row .remove-btn{
+    flex:0 0 auto; border:none; background:none; color:var(--ink-soft); cursor:pointer;
+    font-size:15px; line-height:1; padding:2px 4px; border-radius:2px;
+  }
+  .file-row .remove-btn:hover{ color:var(--red); background:var(--grid-minor); }
+  .clear-all-btn{
+    border:none; background:none; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; cursor:pointer; padding:0;
+  }
+  .clear-all-btn:hover{ color:var(--red); }
+
+  .results-table{ width:100%; border-collapse:collapse; font-size:11.5px; font-family:'IBM Plex Mono',monospace; }
+  .results-table th, .results-table td{ text-align:right; padding:4px 2px; border-bottom:1px dashed var(--line); }
+  .results-table th:first-child, .results-table td:first-child{ text-align:left; }
+  .results-table th{ color:var(--ink-soft); font-weight:600; }
+  .results-table .fname-cell{ display:flex; align-items:center; gap:5px; max-width:76px; }
+  .results-table .fname-cell span.label{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .results-empty{ font-size:12px; color:var(--ink-soft); font-style:italic; }
 
   .plot-area{ flex:1; min-width:0; display:flex; flex-direction:column; gap:16px; }
   .plot-row{ display:flex; gap:16px; flex-wrap:wrap; }
@@ -164,9 +182,9 @@
     </div>
     <div class="toolbar">
       <label class="btn primary" for="fileInput" id="openLabel">
-        <span class="btn-icon">⇪</span> Åpne Excel-fil
+        <span class="btn-icon">⇪</span> Åpne Excel-filer
       </label>
-      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <input type="file" id="fileInput" accept=".xlsx,.xls" multiple>
       <span class="toolbar-divider"></span>
       <button class="btn" id="saveBtn" disabled>Lagre resultater</button>
     </div>
@@ -175,6 +193,16 @@
   <div class="layout">
 
     <aside class="sidebar">
+
+      <div class="panel">
+        <p class="panel-title">
+          <span>Lastede filer</span>
+          <button class="clear-all-btn" id="clearAllBtn" style="display:none;">Fjern alle</button>
+        </p>
+        <div id="fileList">
+          <div class="file-empty" id="fileEmptyMsg">Ingen filer lastet inn ennå</div>
+        </div>
+      </div>
 
       <div class="panel">
         <p class="panel-title no-caps">Tangentlinje (p'–q)</p>
@@ -209,20 +237,18 @@
       <div class="panel">
         <p class="panel-title">Resultater</p>
         <div class="readout"><span class="k">M</span><span class="v" id="outM">–</span></div>
-        <div class="readout"><span class="k">p' ∩</span><span class="v" id="outPint">–</span></div>
-        <div class="readout"><span class="k">q ∩</span><span class="v" id="outQint">–</span></div>
-        <div class="readout"><span class="k">ε ved M-skj.</span><span class="v" id="outEpsM">–</span></div>
-        <div class="readout"><span class="k">ε ved s<sub>u</sub></span><span class="v" id="outEps">–</span></div>
+        <div id="resultsTableWrap" style="margin-top:8px;">
+          <div class="results-empty" id="resultsEmptyMsg">Last inn filer for å se skjæringspunkt per prøve.</div>
+        </div>
       </div>
 
       <div class="panel">
         <p class="panel-title">Tegnforklaring</p>
         <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
-          <div><span class="swatch" style="background:var(--accent);"></span>p'–q kurve</div>
           <div><span class="swatch" style="background:var(--red);border-top:2px dashed var(--red);height:0;"></span>Tangentlinje</div>
           <div><span class="swatch dot" style="background:var(--red);"></span>a (skjæring p'-akse)</div>
-          <div><span class="swatch" style="background:var(--blue);"></span>τ<sub>max</sub>–tøyning</div>
           <div><span class="swatch" style="background:var(--red);border-top:2px dashed var(--red);height:0;"></span>s<sub>u</sub>-linje</div>
+          <div style="color:var(--ink-soft);font-size:11px;">kurvefarger vises i «Lastede filer»</div>
         </div>
       </div>
 
@@ -231,7 +257,7 @@
     <main class="plot-area">
       <div id="emptyState" class="empty-state">
         <div>Ingen data lastet inn ennå</div>
-        <div>Klikk «Åpne Excel-fil» for å starte</div>
+        <div>Klikk «Åpne Excel-filer» for å starte (flere filer kan velges samtidig)</div>
       </div>
 
       <div class="plot-row" id="plotRow" style="display:none;">
@@ -259,18 +285,20 @@
      KONSTANTER
      ========================================================= */
   const COLORS = {
-    curve:   '#2c4a3e',
-    tangent: '#c0392b',
-    point:   '#c0392b',
-    tau:     '#2c5f8a',
-    suLine:  '#c0392b',
-    grid:    '#d9d2bc',
+    tangent:   '#c0392b',
+    point:     '#c0392b',
+    suLine:    '#c0392b',
+    grid:      '#d9d2bc',
     gridMinor: '#efebe0',
-    axis:    '#23261f',
-    tick:    '#5b5f52',
-    zero:    '#1a1a1a',
-    bg:      '#fffdf8'
+    axis:      '#23261f',
+    tick:      '#5b5f52',
+    zero:      '#1a1a1a',
+    bg:        '#fffdf8'
   };
+  // Sykles gjennom for hver innlastede fil, slik at hver prøve får sin egen farge
+  // både på p'-q-kurven og på τmax-tøyningskurven.
+  const PALETTE = ['#2c4a3e', '#2c5f8a', '#c0392b', '#b0762c', '#6c4a91', '#1c7a72', '#a35d1c', '#4a4a4a'];
+
   const FONT_UI   = 'Inter, Arial, sans-serif';
   const FONT_MONO = '"IBM Plex Mono", monospace';
 
@@ -278,8 +306,8 @@
      TILSTAND
      ========================================================= */
   const state = {
-    data: null,          // [{p, q, tauMax, strain}, ...]
-    ranges: { pMax: 100, qMax: 100, tauMin: 0, tauMax: 100, strainMax: 10 },
+    series: [],           // [{id, name, color, data:[{p,q,tauMax,strain}], ranges:{pMax,qMax,tauMin,tauMax,strainMax}}]
+    nextColorIdx: 0,
     params: { a: 10, phi: 30, su: 20 }
   };
 
@@ -297,7 +325,12 @@
     canvas2:    $('plot2'),
     plot1Label: $('plot1Label'),
     plot2Label: $('plot2Label'),
-    out: { M: $('outM'), pInt: $('outPint'), qInt: $('outQint'), epsM: $('outEpsM'), eps: $('outEps') },
+    fileList:      $('fileList'),
+    fileEmptyMsg:  $('fileEmptyMsg'),
+    clearAllBtn:   $('clearAllBtn'),
+    resultsWrap:     $('resultsTableWrap'),
+    resultsEmptyMsg: $('resultsEmptyMsg'),
+    outM: $('outM'),
     controls: {
       a:   { slider: null,            input: $('aInput') },
       phi: { slider: $('phiSlider'),  input: $('phiInput') },
@@ -306,7 +339,7 @@
   };
 
   /* =========================================================
-     SKALA-/TEKST-/AKSEHJELPERE (samme mønster som ødometerplotteren)
+     SKALA-/TEKST-/AKSEHJELPERE
      ========================================================= */
   function linearScale(d0, d1, r0, r1){
     const span = (d1 - d0) || 1;
@@ -346,22 +379,13 @@
     return ticks;
   }
 
-  function fmt(v){
-    if(Math.abs(v) < 0.0001) return '0';
-    if(Math.abs(v) >= 100) return v.toFixed(0);
-    if(Math.abs(v) >= 10) return v.toFixed(1);
-    return v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-  }
-
-  // Finner et fint steg for hovedlinjer (med tall) og et finere steg for
-  // hjelpelinjer (uten tall), slik at f.eks. en kPa-akse får hjelpelinjer
-  // hver 5. kPa og hovedlinjer med lesbar avstand (25/50/100 osv.).
+  // Hovedsteg (med tall) + finere hjelpesteg (uten tall), f.eks. hjelpelinjer
+  // hver 5. kPa og hovedlinjer med lesbar avstand (25/50/100 kPa osv.).
   function computeGridSteps(range, minorStep, majorCandidates){
-    const minor = minorStep;
     let major = majorCandidates.find(c => range / c <= 10);
     if(!major) major = majorCandidates[majorCandidates.length - 1];
-    if(major < minor) major = minor;
-    return { major, minor };
+    if(major < minorStep) major = minorStep;
+    return { major, minor: minorStep };
   }
 
   function stepTicks(min, max, step){
@@ -371,6 +395,13 @@
       ticks.push(Math.round(v / step) * step);
     }
     return ticks;
+  }
+
+  function fmt(v){
+    if(Math.abs(v) < 0.0001) return '0';
+    if(Math.abs(v) >= 100) return v.toFixed(0);
+    if(Math.abs(v) >= 10) return v.toFixed(1);
+    return v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   }
 
   function drawLabel(ctx, segments, x, y, align, fontFamily, weight){
@@ -403,19 +434,6 @@
     ctx.textBaseline = prevBaseline;
   }
 
-  function measureLabelWidth(ctx, segments, fontFamily, weight){
-    weight = weight || '600';
-    fontFamily = fontFamily || FONT_UI;
-    const baseFont = weight + ' 12px ' + fontFamily;
-    const subFont  = weight + ' 9px ' + fontFamily;
-    let total = 0;
-    segments.forEach(([t, sub]) => {
-      ctx.font = sub ? subFont : baseFont;
-      total += ctx.measureText(t).width;
-    });
-    return total;
-  }
-
   function prepareCanvas(canvas, cssHeight){
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.getBoundingClientRect().width || canvas.parentElement.clientWidth;
@@ -431,20 +449,16 @@
   }
 
   function drawXGrid(ctx, majorTicks, minorTicks, xMin, xMax, xToPx, top, bottom){
-    // hjelpelinjer (lyse, ingen tall)
-    ctx.strokeStyle = COLORS.gridMinor;
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = COLORS.gridMinor; ctx.lineWidth = 1;
     minorTicks.forEach(t => {
       if(t < xMin || t > xMax) return;
       const px = xToPx(t);
       ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, bottom); ctx.stroke();
     });
-    // hovedlinjer (tydeligere, med tall)
     ctx.font = '11px ' + FONT_MONO;
     ctx.fillStyle = COLORS.tick;
     ctx.strokeStyle = COLORS.grid;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     majorTicks.forEach(t => {
       if(t < xMin || t > xMax) return;
       const px = xToPx(t);
@@ -454,8 +468,7 @@
   }
 
   function drawYGridLeft(ctx, majorTicks, minorTicks, yMin, yMax, yToPx, left, right, labelX){
-    ctx.strokeStyle = COLORS.gridMinor;
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = COLORS.gridMinor; ctx.lineWidth = 1;
     minorTicks.forEach(t => {
       if(t < yMin || t > yMax) return;
       const py = yToPx(t);
@@ -464,8 +477,7 @@
     ctx.font = '11px ' + FONT_MONO;
     ctx.fillStyle = COLORS.tick;
     ctx.strokeStyle = COLORS.grid;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     majorTicks.forEach(t => {
       if(t < yMin || t > yMax) return;
       const py = yToPx(t);
@@ -480,7 +492,7 @@
     ctx.strokeRect(x, y, w, h);
   }
 
-  function drawSeries(ctx, points, color, lineWidth){
+  function drawSeriesLine(ctx, points, color, lineWidth){
     if(!points.length) return;
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
@@ -506,7 +518,7 @@
     return (6 * Math.sin(phiRad)) / (3 - Math.sin(phiRad));
   }
 
-  // Finner datapunktet på p'-q-kurven som ligger nærmest tangentlinjen.
+  // Finner datapunktet på én prøves p'-q-kurve som ligger nærmest tangentlinjen.
   function findIntersection(data, M, a){
     let bestIdx = -1, bestDiff = Infinity;
     data.forEach((d, i) => {
@@ -518,7 +530,7 @@
     return bestIdx >= 0 ? data[bestIdx] : null;
   }
 
-  // Finner tøyningen ved det punktet der tau_max er nærmest s_u.
+  // Finner tøyningen ved det punktet der tau_max er nærmest s_u, for én prøve.
   function findStrainAtSu(data, su){
     let bestIdx = -1, bestDiff = Infinity;
     data.forEach((d, i) => {
@@ -529,8 +541,20 @@
     return bestIdx >= 0 ? data[bestIdx].strain : null;
   }
 
+  function combinedRanges(){
+    const s = state.series;
+    if(!s.length) return { pMax: 100, qMax: 100, tauMin: 0, tauMax: 100, strainMax: 10 };
+    return {
+      pMax:      Math.max(...s.map(x => x.ranges.pMax)),
+      qMax:      Math.max(...s.map(x => x.ranges.qMax)),
+      tauMin:    Math.min(...s.map(x => x.ranges.tauMin)),
+      tauMax:    Math.max(...s.map(x => x.ranges.tauMax)),
+      strainMax: Math.max(...s.map(x => x.ranges.strainMax))
+    };
+  }
+
   /* =========================================================
-     PLOT 1: p'–q med tangentlinje
+     PLOT 1: p'–q med tangentlinje, alle innlastede prøver
      ========================================================= */
   function renderPlot1(){
     const { ctx, w, h } = prepareCanvas(dom.canvas1, 460);
@@ -539,45 +563,39 @@
     const plotH = Math.max(10, h - marginT - marginB);
     const top = marginT, bottom = marginT + plotH, left = marginL, right = marginL + plotW;
 
-    const { params, ranges } = state;
+    const { params } = state;
+    const ranges = combinedRanges();
     const xMin = -20, xMax = Math.max(ranges.pMax * 1.1, xMin + 1);
     const yMin = 0, yMax = Math.max(ranges.qMax * 1.1, 1);
 
     const xToPx = linearScale(xMin, xMax, left, right);
     const yToPx = linearScale(yMin, yMax, bottom, top);
 
-    // p' og q er begge i kPa: hjelpelinjer hver 5 kPa, hovedlinjer med tall
-    // valgt så det blir maks ca. 10 av dem (25/50/100 kPa osv.).
     const kpaMajors = [5, 10, 25, 50, 100, 200, 250, 500, 1000];
     const xSteps = computeGridSteps(xMax - xMin, 5, kpaMajors);
     const ySteps = computeGridSteps(yMax - yMin, 5, kpaMajors);
-    const xMajor = stepTicks(xMin, xMax, xSteps.major);
-    const xMinor = stepTicks(xMin, xMax, xSteps.minor);
-    const yMajor = stepTicks(yMin, yMax, ySteps.major);
-    const yMinor = stepTicks(yMin, yMax, ySteps.minor);
 
-    drawXGrid(ctx, xMajor, xMinor, xMin, xMax, xToPx, top, bottom);
-    drawYGridLeft(ctx, yMajor, yMinor, yMin, yMax, yToPx, left, right, left - 8);
+    drawXGrid(ctx, stepTicks(xMin, xMax, xSteps.major), stepTicks(xMin, xMax, xSteps.minor), xMin, xMax, xToPx, top, bottom);
+    drawYGridLeft(ctx, stepTicks(yMin, yMax, ySteps.major), stepTicks(yMin, yMax, ySteps.minor), yMin, yMax, yToPx, left, right, left - 8);
     drawFrame(ctx, left, top, plotW, plotH);
 
     const M = computeM(params.phi);
+    const intersections = [];
 
     withClip(ctx, left, top, plotW, plotH, () => {
-      // nullreferanselinjer
       ctx.strokeStyle = COLORS.zero; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(xToPx(0), top); ctx.lineTo(xToPx(0), bottom); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(left, yToPx(0)); ctx.lineTo(right, yToPx(0)); ctx.stroke();
 
-      // p'-q kurve
-      if(state.data && state.data.length){
-        drawSeries(
+      state.series.forEach(s => {
+        drawSeriesLine(
           ctx,
-          state.data.filter(d => !isNaN(d.p) && !isNaN(d.q)).map(d => [xToPx(d.p), yToPx(d.q)]),
-          COLORS.curve, 2
+          s.data.filter(d => !isNaN(d.p) && !isNaN(d.q)).map(d => [xToPx(d.p), yToPx(d.q)]),
+          s.color, 2
         );
-      }
+      });
 
-      // tangentlinje: q = M*(p'+a)
+      // felles tangentlinje: q = M*(p'+a)
       ctx.strokeStyle = COLORS.tangent; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
       ctx.beginPath();
       ctx.moveTo(xToPx(xMin), yToPx(M * (xMin + params.a)));
@@ -590,24 +608,20 @@
       ctx.beginPath();
       ctx.arc(xToPx(-params.a), yToPx(0), 4.5, 0, Math.PI * 2);
       ctx.fill();
-    });
 
-    // info-boks med skjæringspunktet mellom kurve og tangent
-    const intersection = state.data ? findIntersection(state.data, M, params.a) : null;
-    if(intersection){
-      const boxX = left + 10, boxY = top + 10, boxW = 148, boxH = 60;
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.strokeStyle = COLORS.grid;
-      ctx.lineWidth = 1;
-      ctx.fillRect(boxX, boxY, boxW, boxH);
-      ctx.strokeRect(boxX, boxY, boxW, boxH);
-      ctx.fillStyle = COLORS.axis;
-      drawLabel(ctx, [["p' = ", 0], [fmt(intersection.p), 0], [' kPa', 0]], boxX + 10, boxY + 18, 'left', FONT_MONO, '500');
-      drawLabel(ctx, [['q = ', 0], [fmt(intersection.q), 0], [' kPa', 0]], boxX + 10, boxY + 34, 'left', FONT_MONO, '500');
-      if(!isNaN(intersection.strain)){
-        drawLabel(ctx, [['ε = ', 0], [fmt(intersection.strain), 0], [' %', 0]], boxX + 10, boxY + 50, 'left', FONT_MONO, '500');
-      }
-    }
+      // skjæringspunkt kurve/tangent per prøve
+      state.series.forEach(s => {
+        const inter = findIntersection(s.data, M, params.a);
+        intersections.push({ series: s, point: inter });
+        if(inter){
+          const px = xToPx(inter.p), py = yToPx(inter.q);
+          ctx.fillStyle = s.color;
+          ctx.strokeStyle = COLORS.axis;
+          ctx.lineWidth = 1.3;
+          ctx.beginPath(); ctx.arc(px, py, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+      });
+    });
 
     ctx.fillStyle = COLORS.axis;
     drawLabel(ctx, [["p' [kPa]", 0]], left + plotW / 2, h - 4, 'center');
@@ -616,11 +630,11 @@
     drawLabel(ctx, [['q [kPa]', 0]], 0, 0, 'center');
     ctx.restore();
 
-    updateReadouts(M, intersection);
+    return { M, intersections };
   }
 
   /* =========================================================
-     PLOT 2: τmax – tøyning med s_u-linje
+     PLOT 2: τmax – tøyning med s_u-linje, alle innlastede prøver
      ========================================================= */
   function renderPlot2(){
     const { ctx, w, h } = prepareCanvas(dom.canvas2, 460);
@@ -629,7 +643,8 @@
     const plotH = Math.max(10, h - marginT - marginB);
     const top = marginT, bottom = marginT + plotH, left = marginL, right = marginL + plotW;
 
-    const { ranges, params } = state;
+    const { params } = state;
+    const ranges = combinedRanges();
     const xMin = 0, xMax = Math.max(ranges.strainMax * 1.05, 1);
     const span = ranges.tauMax - ranges.tauMin;
     const yMin = Math.max(0, ranges.tauMin - span * 0.05);
@@ -638,31 +653,42 @@
     const xToPx = linearScale(xMin, xMax, left, right);
     const yToPx = linearScale(yMin, yMax, bottom, top);
 
-    const xMajor = niceTicks(xMin, xMax, 7);   // tøyning i %: vanlig fin inndeling
+    const xMajor = niceTicks(xMin, xMax, 7);
     const kpaMajors = [5, 10, 25, 50, 100, 200, 250, 500, 1000];
-    const ySteps = computeGridSteps(yMax - yMin, 5, kpaMajors);   // τmax i kPa: hver 5 kPa
-    const yMajor = stepTicks(yMin, yMax, ySteps.major);
-    const yMinor = stepTicks(yMin, yMax, ySteps.minor);
+    const ySteps = computeGridSteps(yMax - yMin, 5, kpaMajors);
 
     drawXGrid(ctx, xMajor, [], xMin, xMax, xToPx, top, bottom);
-    drawYGridLeft(ctx, yMajor, yMinor, yMin, yMax, yToPx, left, right, left - 8);
+    drawYGridLeft(ctx, stepTicks(yMin, yMax, ySteps.major), stepTicks(yMin, yMax, ySteps.minor), yMin, yMax, yToPx, left, right, left - 8);
     drawFrame(ctx, left, top, plotW, plotH);
 
-    withClip(ctx, left, top, plotW, plotH, () => {
-      if(state.data && state.data.length){
-        drawSeries(
-          ctx,
-          state.data.filter(d => !isNaN(d.strain) && !isNaN(d.tauMax)).map(d => [xToPx(d.strain), yToPx(d.tauMax)]),
-          COLORS.tau, 2
-        );
-      }
+    const strainAtSu = [];
 
-      // s_u-linje
+    withClip(ctx, left, top, plotW, plotH, () => {
+      state.series.forEach(s => {
+        drawSeriesLine(
+          ctx,
+          s.data.filter(d => !isNaN(d.strain) && !isNaN(d.tauMax)).map(d => [xToPx(d.strain), yToPx(d.tauMax)]),
+          s.color, 2
+        );
+      });
+
       ctx.strokeStyle = COLORS.suLine; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
       ctx.beginPath();
       ctx.moveTo(left, yToPx(params.su)); ctx.lineTo(right, yToPx(params.su));
       ctx.stroke();
       ctx.setLineDash([]);
+
+      state.series.forEach(s => {
+        const eps = findStrainAtSu(s.data, params.su);
+        strainAtSu.push({ series: s, eps });
+        if(eps !== null){
+          const px = xToPx(eps), py = yToPx(params.su);
+          ctx.fillStyle = s.color;
+          ctx.strokeStyle = COLORS.axis;
+          ctx.lineWidth = 1.3;
+          ctx.beginPath(); ctx.arc(px, py, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+      });
     });
 
     ctx.fillStyle = COLORS.axis;
@@ -671,28 +697,62 @@
     ctx.translate(14, top + plotH / 2); ctx.rotate(-Math.PI / 2);
     drawLabel(ctx, [['τ', 0], ['max', 1], [' [kPa]', 0]], 0, 0, 'center');
     ctx.restore();
+
+    return { strainAtSu };
   }
 
-  function updateReadouts(M, intersection){
-    dom.out.M.textContent = M.toFixed(3);
-    dom.out.pInt.textContent = intersection ? fmt(intersection.p) + ' kPa' : '–';
-    dom.out.qInt.textContent = intersection ? fmt(intersection.q) + ' kPa' : '–';
-    const epsAtM = intersection && !isNaN(intersection.strain) ? intersection.strain : null;
-    dom.out.epsM.textContent = epsAtM !== null ? fmt(epsAtM) + ' %' : '–';
+  /* =========================================================
+     RESULTATPANEL (tabell, én rad per fil) + plot-titler
+     ========================================================= */
+  function updateResultsPanel(M, intersections, strainAtSu){
+    dom.outM.textContent = M.toFixed(3);
 
-    const eps = state.data ? findStrainAtSu(state.data, state.params.su) : null;
-    dom.out.eps.textContent = eps !== null ? fmt(eps) + ' %' : '–';
-    dom.plot2Label.innerHTML = 'τ<sub>max</sub> – tøyning · s<sub>u</sub> = ' + state.params.su.toFixed(1) + ' kPa'
-      + (eps !== null ? ', ε = ' + fmt(eps) + ' %' : '');
+    if(!state.series.length){
+      dom.resultsWrap.innerHTML = '';
+      dom.resultsWrap.appendChild(dom.resultsEmptyMsg);
+      dom.plot1Label.textContent = "p'–q plot";
+      dom.plot2Label.innerHTML = 'τ<sub>max</sub> – tøyning';
+      return;
+    }
+
+    const epsBySeriesId = {};
+    strainAtSu.forEach(row => { epsBySeriesId[row.series.id] = row.eps; });
+
+    let html = '<table class="results-table"><thead><tr>'
+      + '<th>Fil</th><th>p\' ∩</th><th>q ∩</th><th>ε(M)</th><th>ε(s<sub>u</sub>)</th>'
+      + '</tr></thead><tbody>';
+
+    intersections.forEach(row => {
+      const s = row.series, pt = row.point;
+      const eps = epsBySeriesId[s.id];
+      html += '<tr>'
+        + '<td><div class="fname-cell"><span class="swatch dot" style="background:' + s.color + ';"></span>'
+        + '<span class="label" title="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + '</span></div></td>'
+        + '<td>' + (pt ? fmt(pt.p) : '–') + '</td>'
+        + '<td>' + (pt ? fmt(pt.q) : '–') + '</td>'
+        + '<td>' + (pt && !isNaN(pt.strain) ? fmt(pt.strain) : '–') + '</td>'
+        + '<td>' + (eps !== null && eps !== undefined ? fmt(eps) : '–') + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    dom.resultsWrap.innerHTML = html;
+
     dom.plot1Label.textContent = "p'–q plot · a = " + state.params.a.toFixed(2)
-      + ', φ = ' + state.params.phi.toFixed(1) + '°, M = ' + M.toFixed(3)
-      + (epsAtM !== null ? ', ε = ' + fmt(epsAtM) + ' %' : '');
+      + ', φ = ' + state.params.phi.toFixed(1) + '°, M = ' + M.toFixed(3);
+    dom.plot2Label.innerHTML = 'τ<sub>max</sub> – tøyning · s<sub>u</sub> = ' + state.params.su.toFixed(1) + ' kPa';
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
   }
 
   function renderAll(){
-    if(!state.data) return;
-    renderPlot1();
-    renderPlot2();
+    if(!state.series.length) return;
+    const { M, intersections } = renderPlot1();
+    const { strainAtSu } = renderPlot2();
+    updateResultsPanel(M, intersections, strainAtSu);
   }
 
   let renderScheduled = false;
@@ -720,7 +780,56 @@
   Object.keys(dom.controls).forEach(key => bindControl(key, dom.controls[key]));
 
   /* =========================================================
-     INNLESING AV EXCEL-FIL
+     FILLISTE (sidepanel)
+     ========================================================= */
+  function renderFileList(){
+    dom.fileList.innerHTML = '';
+    if(!state.series.length){
+      dom.fileList.appendChild(dom.fileEmptyMsg);
+      dom.clearAllBtn.style.display = 'none';
+      return;
+    }
+    dom.clearAllBtn.style.display = '';
+    state.series.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'file-row';
+      row.innerHTML = '<span class="swatch dot" style="background:' + s.color + ';"></span>'
+        + '<span class="fname" title="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + '</span>'
+        + '<button class="remove-btn" title="Fjern fil" data-id="' + s.id + '">×</button>';
+      dom.fileList.appendChild(row);
+    });
+    dom.fileList.querySelectorAll('.remove-btn').forEach(btn => {
+      btn.addEventListener('click', () => removeSeries(btn.getAttribute('data-id')));
+    });
+  }
+
+  function removeSeries(id){
+    state.series = state.series.filter(s => s.id !== id);
+    renderFileList();
+    if(!state.series.length){
+      dom.emptyState.style.display = '';
+      dom.plotRow.style.display = 'none';
+      dom.saveBtn.disabled = true;
+      dom.openLabel.innerHTML = '<span class="btn-icon">⇪</span> Åpne Excel-filer';
+      updateResultsPanel(computeM(state.params.phi), [], []);
+    } else {
+      scheduleRender();
+    }
+  }
+
+  dom.clearAllBtn.addEventListener('click', () => {
+    state.series = [];
+    state.nextColorIdx = 0;
+    renderFileList();
+    dom.emptyState.style.display = '';
+    dom.plotRow.style.display = 'none';
+    dom.saveBtn.disabled = true;
+    dom.openLabel.innerHTML = '<span class="btn-icon">⇪</span> Åpne Excel-filer';
+    updateResultsPanel(computeM(state.params.phi), [], []);
+  });
+
+  /* =========================================================
+     INNLESING AV EXCEL-FILER
      ========================================================= */
   function normalizeKey(k){
     return String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -747,20 +856,18 @@
     if(!rows.length) throw new Error('Fant ingen rader i filen.');
     const cols = detectColumns(Object.keys(rows[0]));
     if(!cols.p || !cols.q){
-      throw new Error('Fant ikke kolonnene "p\'" og/eller "q" i filen.');
+      throw new Error('Fant ikke kolonnene "p\'" og/eller "q".');
     }
     const data = rows.map(r => ({
-      p:       toNum(r[cols.p]),
-      q:       toNum(r[cols.q]),
-      tauMax:  cols.tauMax ? toNum(r[cols.tauMax]) : NaN,
-      strain:  cols.strain ? toNum(r[cols.strain]) : NaN
+      p:      toNum(r[cols.p]),
+      q:      toNum(r[cols.q]),
+      tauMax: cols.tauMax ? toNum(r[cols.tauMax]) : NaN,
+      strain: cols.strain ? toNum(r[cols.strain]) : NaN
     }));
 
     const only = arr => arr.filter(v => !isNaN(v));
-    const pVals      = only(data.map(d => d.p));
-    const qVals      = only(data.map(d => d.q));
-    const tauVals    = only(data.map(d => d.tauMax));
-    const strainVals = only(data.map(d => d.strain));
+    const pVals = only(data.map(d => d.p)), qVals = only(data.map(d => d.q));
+    const tauVals = only(data.map(d => d.tauMax)), strainVals = only(data.map(d => d.strain));
 
     return {
       data,
@@ -774,27 +881,62 @@
     };
   }
 
-  function applyLoadedData(parsed){
-    state.data = parsed.data;
-    state.ranges = parsed.ranges;
+  function readFileAsRows(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = evt => {
+        try{
+          const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          resolve(XLSX.utils.sheet_to_json(sheet, { defval: null }));
+        }catch(err){ reject(err); }
+      };
+      reader.onerror = () => reject(new Error('Kunne ikke lese filen.'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
 
-    const c = dom.controls;
-    state.params.a = 10;
-    state.params.phi = 30;
-    c.a.input.value = 10;
-    c.phi.slider.value = 30; c.phi.input.value = 30;
+  let seriesCounter = 0;
+  function nextColor(){
+    const c = PALETTE[state.nextColorIdx % PALETTE.length];
+    state.nextColorIdx++;
+    return c;
+  }
 
-    c.su.slider.min = state.ranges.tauMin;
-    c.su.slider.max = state.ranges.tauMax;
-    const suDefault = Math.min(Math.max(20, state.ranges.tauMin), state.ranges.tauMax);
-    state.params.su = suDefault;
-    c.su.slider.value = suDefault;
-    c.su.input.value = suDefault;
+  async function handleFiles(fileList){
+    const files = Array.from(fileList);
+    if(!files.length) return;
+    const errors = [];
 
-    dom.emptyState.style.display = 'none';
-    dom.plotRow.style.display = '';
-    dom.saveBtn.disabled = false;
-    dom.openLabel.innerHTML = '<span class="btn-icon">⇪</span> Bytt fil';
+    for(const file of files){
+      try{
+        const rows = await readFileAsRows(file);
+        const parsed = parseRows(rows);
+        seriesCounter++;
+        state.series.push({
+          id: 's' + seriesCounter + '_' + Date.now(),
+          name: file.name,
+          color: nextColor(),
+          data: parsed.data,
+          ranges: parsed.ranges
+        });
+      }catch(err){
+        errors.push(file.name + ': ' + err.message);
+      }
+    }
+
+    if(errors.length){
+      alert('Noen filer kunne ikke leses:\n\n' + errors.join('\n'));
+    }
+
+    if(state.series.length){
+      dom.emptyState.style.display = 'none';
+      dom.plotRow.style.display = '';
+      dom.saveBtn.disabled = false;
+      dom.openLabel.innerHTML = '<span class="btn-icon">⇪</span> Legg til flere filer';
+    }
+
+    renderFileList();
 
     const draw = () => renderAll();
     if(document.fonts && document.fonts.ready){
@@ -805,28 +947,15 @@
   }
 
   dom.fileInput.addEventListener('change', e => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = evt => {
-      try{
-        const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
-        applyLoadedData(parseRows(rows));
-      }catch(err){
-        alert('Klarte ikke å lese Excel-filen: ' + err.message);
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    handleFiles(e.target.files);
     dom.fileInput.value = '';
   });
 
   /* =========================================================
      RESIZE
      ========================================================= */
-  new ResizeObserver(() => { if(state.data) scheduleRender(); }).observe(dom.plotRow);
-  window.addEventListener('resize', () => { if(state.data) scheduleRender(); });
+  new ResizeObserver(() => { if(state.series.length) scheduleRender(); }).observe(dom.plotRow);
+  window.addEventListener('resize', () => { if(state.series.length) scheduleRender(); });
 
   /* =========================================================
      EKSPORT (txt + png)
@@ -843,22 +972,29 @@
   function buildResultText(){
     const p = state.params;
     const M = computeM(p.phi);
-    const intersection = state.data ? findIntersection(state.data, M, p.a) : null;
-    const eps = state.data ? findStrainAtSu(state.data, p.su) : null;
-    return [
+    const lines = [
       'RESULTAT FRA TANGENTTILPASNING',
       '------------------------------',
       '',
       `a       = ${p.a.toFixed(3)}`,
       `phi     = ${p.phi.toFixed(3)} grader`,
       `M       = ${M.toFixed(5)}`,
-      intersection ? `p' (skj) = ${intersection.p.toFixed(3)} kPa` : "p' (skj) = –",
-      intersection ? `q (skj)  = ${intersection.q.toFixed(3)} kPa` : 'q (skj)  = –',
-      intersection && !isNaN(intersection.strain) ? `eps (skj) = ${intersection.strain.toFixed(3)} %` : 'eps (skj) = –',
-      `epsilon = ${eps !== null ? eps.toFixed(3) : '–'} %`,
       `s_u     = ${p.su.toFixed(3)} kPa`,
+      '',
+      'Per prøve:',
       ''
-    ].join('\n');
+    ];
+    state.series.forEach(s => {
+      const inter = findIntersection(s.data, M, p.a);
+      const eps = findStrainAtSu(s.data, p.su);
+      lines.push(`[${s.name}]`);
+      lines.push(inter ? `  p' (skj)  = ${inter.p.toFixed(3)} kPa` : "  p' (skj)  = –");
+      lines.push(inter ? `  q (skj)   = ${inter.q.toFixed(3)} kPa` : '  q (skj)   = –');
+      lines.push(inter && !isNaN(inter.strain) ? `  eps (skj) = ${inter.strain.toFixed(3)} %` : '  eps (skj) = –');
+      lines.push(eps !== null ? `  eps (su)  = ${eps.toFixed(3)} %` : '  eps (su)  = –');
+      lines.push('');
+    });
+    return lines.join('\n');
   }
 
   function exportCompositePng(){
@@ -883,7 +1019,7 @@
   }
 
   dom.saveBtn.addEventListener('click', () => {
-    if(!state.data) return;
+    if(!state.series.length) return;
     downloadBlob(new Blob([buildResultText()], { type: 'text/plain;charset=utf-8' }), 'triax_resultater.txt');
     exportCompositePng();
   });
