@@ -114,7 +114,7 @@
       <input type="file" id="pipeFile" accept=".txt,.csv,.xlsx,.xls">
       <div id="importStatus" style="font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); margin-top: 5px;"></div>
       <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 6px; line-height: 1.5;">
-        genererer stående (vertikale) rør, rødbrun standardfarge. resten av kolonnene blir egenskaper på hvert rør.
+        genererer stående (vertikale) rør, rødbrun standardfarge. resten av kolonnene blir egenskaper på hvert rør. tom/0 i tykkelse-kolonnen gir massiv sylinder uten hulrom (f.eks. stålkjerne).
       </div>
     </div>
 
@@ -456,7 +456,15 @@ function buildGeometry(type, p) {
     case 'cone': return new THREE.ConeGeometry(p.r, p.h, Math.max(3, Math.round(p.seg)));
     case 'sphere': return new THREE.SphereGeometry(p.r, Math.max(3, Math.round(p.seg)), Math.max(3, Math.round(p.seg)));
     case 'tube': {
-      const ro = p.od / 2, ri = ro - p.t;
+      const ro = p.od / 2;
+      const t = p.t || 0;
+      if (t <= 1e-9) {
+        // Massiv sylinder — ingen hulrom (f.eks. stålkjerne i en stålkjernepel)
+        const geo = new THREE.CylinderGeometry(ro, ro, p.h, Math.max(3, Math.round(p.seg)));
+        geo.translate(0, -p.h / 2, 0); // origo = topp, geometrien strekker seg nedover
+        return geo;
+      }
+      const ri = ro - t;
       const shape = new THREE.Shape();
       shape.absarc(0, 0, ro, 0, Math.PI*2, false);
       const hole = new THREE.Path();
@@ -625,13 +633,14 @@ function rowsToPipes(rows) {
     const z = colMap.z !== undefined ? num(row[colMap.z]) : 0;
     let od = num(row[colMap.od]);
     let t = num(row[colMap.t]);
+    if (isNaN(t)) t = 0; // tom tykkelse-celle = massiv sylinder (f.eks. stålkjerne)
     const l = num(row[colMap.l]);
-    if ([x, y, od, t, l].some(v => isNaN(v)) || od <= 0 || l <= 0 || t <= 0) {
+    if ([x, y, od, l].some(v => isNaN(v)) || od <= 0 || l <= 0 || t < 0) {
       errors.push(`Rad ${i + 1}: ugyldige verdier, hoppet over`);
       return;
     }
-    if (mmToM) { od = Math.round(od / 1000 * 1e6) / 1e6; t = Math.round(t / 1000 * 1e6) / 1e6; }
-    if (t >= od / 2) {
+    if (mmToM) { od = Math.round(od / 1000 * 1e6) / 1e6; if (t > 0) t = Math.round(t / 1000 * 1e6) / 1e6; }
+    if (t > 0 && t >= od / 2) {
       errors.push(`Rad ${i + 1}: tykkelse ≥ radius, hoppet over`);
       return;
     }
@@ -697,6 +706,7 @@ document.getElementById('recenterBtn').addEventListener('click', () => {
 });
 
 const ROCK_COLOR = '#8C8C8C'; // steingrå, for bergsegment
+const STEEL_CORE_COLOR = '#2E6FDE'; // blå, for massiv stålkjerne (t=0)
 
 function addPipeSegment({ x, y, z, od, t, h, name, color, props }) {
   const geo = buildGeometry('tube', { od, t, h, seg: 32 });
@@ -723,9 +733,11 @@ function addPipeSegment({ x, y, z, od, t, h, name, color, props }) {
 function addPipeFromData(data, i) {
   const { x, y, z, od, t, l, name, extraProps, bergLen, losmasseLen } = data;
   const baseName = name || `Rør_${i + 1}`;
+  const isCore = !t || t <= 1e-9; // massiv stålkjerne (tykkelse 0/tom)
   const baseProps = [
     { k: 'Øst (X)', v: String(x) }, { k: 'Nord (Y)', v: String(y) },
     { k: 'Ytre diameter [m]', v: String(od) }, { k: 'Tykkelse [m]', v: String(t) },
+    ...(isCore ? [{ k: 'Type', v: 'Massiv stålkjerne' }] : []),
     ...(extraProps || []),
   ];
 
@@ -736,7 +748,7 @@ function addPipeFromData(data, i) {
 
   if (!hasSplit) {
     addPipeSegment({
-      x, y, z, od, t, h: l, name: baseName, color: PIPE_COLOR,
+      x, y, z, od, t, h: l, name: baseName, color: isCore ? STEEL_CORE_COLOR : PIPE_COLOR,
       props: [{ k: 'Kote topp (Z)', v: String(z) }, ...baseProps],
     });
     return;
@@ -744,7 +756,7 @@ function addPipeFromData(data, i) {
 
   if (lm > 0) {
     addPipeSegment({
-      x, y, z, od, t, h: lm, name: `${baseName}_løsmasser`, color: PIPE_COLOR,
+      x, y, z, od, t, h: lm, name: `${baseName}_løsmasser`, color: isCore ? STEEL_CORE_COLOR : PIPE_COLOR,
       props: [
         { k: 'Segment', v: 'Løsmasser' }, { k: 'Kote topp (Z)', v: String(z) },
         { k: 'Lengde segment [m]', v: String(lm) }, ...baseProps,
@@ -754,7 +766,7 @@ function addPipeFromData(data, i) {
   if (bg > 0) {
     const zBerg = z - (isNaN(lm) ? 0 : lm);
     addPipeSegment({
-      x, y, z: zBerg, od, t, h: bg, name: `${baseName}_berg`, color: ROCK_COLOR,
+      x, y, z: zBerg, od, t, h: bg, name: `${baseName}_berg`, color: isCore ? STEEL_CORE_COLOR : ROCK_COLOR,
       props: [
         { k: 'Segment', v: 'Berg' }, { k: 'Kote topp berg (Z)', v: String(zBerg) },
         { k: 'Lengde segment [m]', v: String(bg) }, ...baseProps,
@@ -967,7 +979,9 @@ function exportIFC() {
       const ro = od / 2;
       const profOrigin = E(`IFCCARTESIANPOINT((0.,0.))`);
       const profAx = E(`IFCAXIS2PLACEMENT2D(#${profOrigin},$)`);
-      const profile = E(`IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,$,#${profAx},${F(ro)},${F(t)})`);
+      const profile = (t && t > 0)
+        ? E(`IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,$,#${profAx},${F(ro)},${F(t)})`)
+        : E(`IFCCIRCLEPROFILEDEF(.AREA.,$,#${profAx},${F(ro)})`);
       const extrudeAx = E(`IFCAXIS2PLACEMENT3D(#${origin},$,$)`);
       const dir = E(`IFCDIRECTION((0.,0.,-1.))`); // origo = topp av røret, strekker seg nedover
       geomId = E(`IFCEXTRUDEDAREASOLID(#${profile},#${extrudeAx},#${dir},${F(h)})`);
@@ -1016,9 +1030,7 @@ END-ISO-10303-21;
 }
 
 document.getElementById('exportIfcBtn').addEventListener('click', exportIFC);
-
-// start med ett eksempel-objekt
-addObject();
+renderList(); // vis tom liste ved oppstart (ingen forhåndsmodellert objekt)
 </script>
 </body>
 </html>
