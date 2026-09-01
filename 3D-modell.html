@@ -178,6 +178,11 @@
       <label style="margin:0; font-size:11px;">skriv absolutte verdenskoordinater direkte i IFC-plasseringene (i stedet for lokal origo + IfcMapConversion-offset)</label>
     </div>
 
+    <div class="field">
+      <button id="bergSurfaceBtn" type="button" style="width:100%;">lag bergoverflate (TIN) fra bergpunktene</button>
+      <div id="bergSurfaceStatus" style="font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); margin-top: 5px;"></div>
+    </div>
+
     <hr>
 
     <div class="field">
@@ -257,6 +262,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/delaunator@5.1.0/delaunator.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
@@ -675,6 +681,15 @@ let worldOrigin = { e: 0, n: 0, h: 0 };
 
 function applyOrigin() {
   objects.forEach(o => {
+    if (o.type === 'surface' && o.surfaceWorldVerts) {
+      const posAttr = o.mesh.geometry.attributes.position;
+      o.surfaceWorldVerts.forEach((v, vi) => {
+        posAttr.setXYZ(vi, v.x - worldOrigin.e, v.z - worldOrigin.h, -(v.y - worldOrigin.n));
+      });
+      posAttr.needsUpdate = true;
+      o.mesh.geometry.computeBoundingSphere();
+      return;
+    }
     if (!o.worldPos) return; // manuelt tilførte objekter har ingen verdenskoordinat å forskyve fra
     const { x, y, z } = o.worldPos;
     o.mesh.position.set(x - worldOrigin.e, z - worldOrigin.h, -(y - worldOrigin.n));
@@ -786,6 +801,61 @@ function fitViewToObjects() {
   camera.position.set(center.x + maxDim, center.y + maxDim * 0.8, center.z + maxDim);
   controls.update();
 }
+
+// --- Bergoverflate (TIN) fra kote topp berg i hvert punkt ---
+function buildBergSurface() {
+  const statusEl = document.getElementById('bergSurfaceStatus');
+  const bergObjs = objects.filter(o => o.worldPos && o.props.some(pr => pr.k === 'Segment' && pr.v === 'Berg'));
+  if (bergObjs.length < 3) {
+    statusEl.style.color = '#d9645f';
+    statusEl.textContent = `Trenger minst 3 bergpunkter (fant ${bergObjs.length}) — importer med bergsegment aktivert først.`;
+    return;
+  }
+
+  const worldVerts = bergObjs.map(o => ({ x: o.worldPos.x, y: o.worldPos.y, z: o.worldPos.z }));
+  const delaunay = Delaunator.from(worldVerts, v => v.x, v => v.y);
+  const triangles = Array.from(delaunay.triangles); // flat liste, 3 indekser per trekant
+
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(worldVerts.length * 3);
+  worldVerts.forEach((v, i) => {
+    positions[i * 3] = v.x - worldOrigin.e;
+    positions[i * 3 + 1] = v.z - worldOrigin.h;
+    positions[i * 3 + 2] = -(v.y - worldOrigin.n);
+  });
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setIndex(triangles);
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(ROCK_COLOR), metalness: 0.05, roughness: 0.9,
+    side: THREE.DoubleSide, transparent: true, opacity: 0.75, flatShading: true,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+
+  const id = idCounter++;
+  mesh.userData.id = id;
+  const triCount = triangles.length / 3;
+  objects.push({
+    id, mesh, type: 'surface', params: { punkter: worldVerts.length, trekanter: triCount },
+    name: `Bergoverflate (TIN, ${worldVerts.length} pkt)`,
+    ifcType: 'IFCGEOGRAPHICELEMENT',
+    color: ROCK_COLOR,
+    surfaceWorldVerts: worldVerts,
+    surfaceTriangles: triangles,
+    props: [
+      { k: 'Antall punkter', v: String(worldVerts.length) },
+      { k: 'Antall trekanter', v: String(triCount) },
+    ],
+  });
+  renderList();
+  fitViewToObjects();
+
+  statusEl.style.color = 'var(--accent)';
+  statusEl.textContent = `Bergoverflate generert fra ${worldVerts.length} punkter (${triCount} trekanter).`;
+}
+document.getElementById('bergSurfaceBtn').addEventListener('click', buildBergSurface);
 
 document.getElementById('pipeFile').addEventListener('change', async (e) => {
   const file = e.target.files[0];
@@ -945,9 +1015,11 @@ function exportIFC() {
     const p = o.params;
     const pos = o.mesh.position;
     // Konverter Three.js (Y opp) -> IFC (Z opp): X=x, Y=-z, Z=y
-    const ix = pos.x + (bakeWorldCoords ? worldOrigin.e : 0);
-    const iy = -pos.z + (bakeWorldCoords ? worldOrigin.n : 0);
-    const iz = pos.y + (bakeWorldCoords ? worldOrigin.h : 0);
+    // Flate-objekter (surface) har koordinatene bakt inn direkte per toppunkt — plasseringen skal alltid være (0,0,0).
+    const isSurface = o.type === 'surface';
+    const ix = isSurface ? 0 : pos.x + (bakeWorldCoords ? worldOrigin.e : 0);
+    const iy = isSurface ? 0 : -pos.z + (bakeWorldCoords ? worldOrigin.n : 0);
+    const iz = isSurface ? 0 : pos.y + (bakeWorldCoords ? worldOrigin.h : 0);
     let geomId, repType = 'CSG';
 
     if (o.type === 'box') {
@@ -985,6 +1057,31 @@ function exportIFC() {
       const extrudeAx = E(`IFCAXIS2PLACEMENT3D(#${origin},$,$)`);
       const dir = E(`IFCDIRECTION((0.,0.,-1.))`); // origo = topp av røret, strekker seg nedover
       geomId = E(`IFCEXTRUDEDAREASOLID(#${profile},#${extrudeAx},#${dir},${F(h)})`);
+    } else if (o.type === 'surface') {
+      repType = 'Tessellation';
+      const posAttr = o.mesh.geometry.attributes.position;
+      const coordParts = [];
+      for (let vi = 0; vi < posAttr.count; vi++) {
+        let vx, vy, vz;
+        if (bakeWorldCoords && o.surfaceWorldVerts) {
+          const wv = o.surfaceWorldVerts[vi]; // ekte verdenskoordinater (øst, nord, kote) direkte — ingen akse-flipp nødvendig
+          vx = wv.x; vy = wv.y; vz = wv.z;
+        } else {
+          vx = posAttr.getX(vi); vy = -posAttr.getZ(vi); vz = posAttr.getY(vi);
+        }
+        coordParts.push(`(${F(vx)},${F(vy)},${F(vz)})`);
+      }
+      const coordListId = E(`IFCCARTESIANPOINTLIST3D((${coordParts.join(',')}))`);
+      const triParts = o.surfaceTriangles.length
+        ? (() => {
+            const parts = [];
+            for (let ti = 0; ti < o.surfaceTriangles.length; ti += 3) {
+              parts.push(`(${o.surfaceTriangles[ti] + 1},${o.surfaceTriangles[ti + 1] + 1},${o.surfaceTriangles[ti + 2] + 1})`);
+            }
+            return parts.join(',');
+          })()
+        : '';
+      geomId = E(`IFCTRIANGULATEDFACESET(#${coordListId},$,$,(${triParts}),$)`);
     }
 
     const shapeRep = E(`IFCSHAPEREPRESENTATION(#${ctx},'Body','${repType}',(#${geomId}))`);
