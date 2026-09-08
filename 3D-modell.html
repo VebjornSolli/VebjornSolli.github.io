@@ -110,16 +110,21 @@
     <div class="sub">generer geometri fra tall — ingen tung CAD nødvendig</div>
 
     <div class="field">
-      <label>importer rør fra fil (txt / csv / xlsx)</label>
+      <label>importer fra fil (txt / csv / xlsx) — leser begge faner i samme arbeidsbok</label>
       <input type="file" id="pipeFile" accept=".txt,.csv,.xlsx,.xls">
       <div id="importStatus" style="font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); margin-top: 5px;"></div>
       <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 6px; line-height: 1.5;">
-        genererer stående (vertikale) rør, rødbrun standardfarge. resten av kolonnene blir egenskaper på hvert rør. tom/0 i tykkelse-kolonnen gir massiv sylinder uten hulrom (f.eks. stålkjerne).
+        resten av kolonnene blir egenskaper på hvert element. tom/0 tykkelse i rørprotokollen gir massiv sylinder (f.eks. stålkjerne).
       </div>
     </div>
 
     <div class="field">
-      <label>kolonnebokstaver (Excel) — la stå tomt for auto-gjenkjenning</label>
+      <label style="color: var(--accent);">rørprotokoll — fane</label>
+      <input type="text" id="pipeSheetName" value="Utklipp rørprotokoll">
+    </div>
+
+    <div class="field">
+      <label>kolonnebokstaver, rørprotokoll — la stå tomt for auto-gjenkjenning</label>
       <div class="row" style="margin-bottom:6px;">
         <input type="text" id="colOD" placeholder="OD" title="Ytre diameter" value="C">
         <input type="text" id="colT" placeholder="Tykk." title="Tykkelse" value="D">
@@ -143,7 +148,39 @@
 
     <div class="field" style="display:flex; align-items:center; gap:8px;">
       <input type="checkbox" id="mmToM" checked style="width:auto;">
-      <label style="margin:0; font-size:11px;">diameter/tykkelse oppgitt i mm (konverteres til meter)</label>
+      <label style="margin:0; font-size:11px;">diameter/tykkelse (rørprotokoll) oppgitt i mm</label>
+    </div>
+
+    <hr>
+
+    <div class="field">
+      <label style="color: var(--accent);">spuntprotokoll — fane</label>
+      <input type="text" id="spuntSheetName" value="Utklipp spuntprotokoll">
+    </div>
+
+    <div class="field">
+      <label>kolonnebokstaver, spuntprotokoll</label>
+      <div class="row" style="margin-bottom:6px;">
+        <input type="text" id="spColB" placeholder="Bredde" title="Bredde spunt" value="C">
+        <input type="text" id="spColT" placeholder="Tykk." title="Tykkelse spunt" value="D">
+        <input type="text" id="spColZ" placeholder="Kote" title="Kote topp (Z)" value="E">
+      </div>
+      <div class="row" style="margin-bottom:6px;">
+        <input type="text" id="spColNorth" placeholder="Nord" title="Nord-koordinat" value="F">
+        <input type="text" id="spColEast" placeholder="Øst" title="Øst-koordinat" value="G">
+        <input type="text" id="spColRot" placeholder="Retning" title="Retning (grader, med klokka fra nord)" value="H">
+      </div>
+      <div class="row">
+        <input type="text" id="spColL" placeholder="Lengde" title="Lengde (vertikal)" value="I">
+      </div>
+      <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 6px; line-height: 1.5;">
+        antar samme kolonnemønster som rørprotokollen (kote/nord/øst i E/F/G) — juster om det avviker. lengde-kolonnen (I) er ikke bekreftet av deg ennå, sjekk gjerne at den stemmer.
+      </div>
+    </div>
+
+    <div class="field" style="display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="spMmToM" checked style="width:auto;">
+      <label style="margin:0; font-size:11px;">bredde/tykkelse (spuntprotokoll) oppgitt i mm</label>
     </div>
 
     <hr>
@@ -192,7 +229,8 @@
         <option value="cylinder">sylinder (r, h)</option>
         <option value="cone">kjegle (r, h)</option>
         <option value="sphere">kule (r)</option>
-        <option value="tube">rør (r-ytre, r-indre, h)</option>
+        <option value="tube">rør (od, t, h)</option>
+        <option value="flatspunt">flatspunt (cellespunt)</option>
       </select>
     </div>
 
@@ -252,6 +290,7 @@
       <button id="exportIfcBtn">eksporter IFC</button>
     </div>
     <div id="exportRow">
+      <button id="exportDxfBtn">eksporter DXF</button>
       <button id="clearBtn">tøm scene</button>
     </div>
   </div>
@@ -399,6 +438,7 @@ const paramDefs = {
   cone:     [{k:'r',l:'radius (base)',v:1}, {k:'h',l:'høyde',v:2}, {k:'seg',l:'segmenter',v:32}],
   sphere:   [{k:'r',l:'radius',v:1}, {k:'seg',l:'segmenter',v:32}],
   tube:     [{k:'od',l:'ytre diameter',v:2}, {k:'t',l:'tykkelse',v:0.2}, {k:'h',l:'høyde',v:1.5}, {k:'seg',l:'segmenter',v:32}],
+  flatspunt: [{k:'b',l:'bredde',v:0.6}, {k:'t',l:'tykkelse',v:0.012}, {k:'rot',l:'retning (grader, med klokka fra nord)',v:0}, {k:'h',l:'lengde (vertikal)',v:6}],
 };
 
 const typeSel = document.getElementById('type');
@@ -406,11 +446,20 @@ const paramsDiv = document.getElementById('params');
 
 function renderParams() {
   const defs = paramDefs[typeSel.value];
-  paramsDiv.innerHTML = defs.map(d => `
+  paramsDiv.innerHTML = defs.map(d => {
+    if (d.type === 'text') {
+      return `
+    <div class="field">
+      <label>${d.l}</label>
+      <textarea id="p_${d.k}" rows="2" style="width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text); padding:7px 8px; border-radius:4px; font-family:var(--mono); font-size:11px; resize:vertical;">${d.v}</textarea>
+    </div>`;
+    }
+    return `
     <div class="field">
       <label>${d.l}</label>
       <input type="number" id="p_${d.k}" value="${d.v}" step="0.1">
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 typeSel.addEventListener('change', renderParams);
 renderParams();
@@ -451,7 +500,10 @@ let idCounter = 1;
 function getParamVals() {
   const defs = paramDefs[typeSel.value];
   const vals = {};
-  defs.forEach(d => vals[d.k] = parseFloat(document.getElementById('p_'+d.k).value));
+  defs.forEach(d => {
+    const el = document.getElementById('p_' + d.k);
+    vals[d.k] = d.type === 'text' ? el.value : parseFloat(el.value);
+  });
   return vals;
 }
 
@@ -481,12 +533,52 @@ function buildGeometry(type, p) {
       geo.translate(0, -p.h, 0); // origo = topp av røret, geometrien strekker seg nedover
       return geo;
     }
+    case 'flatspunt':
+      return extrudeFromPolygon(p.profilePoints, p.h);
   }
+}
+
+// --- Flatspunt (cellespunt) — flat, rektangulær tverrsnittsplate ---
+function rotatePoints(pts, degrees) {
+  if (!degrees) return pts;
+  const rad = degrees * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  return pts.map(([x, y]) => [x * cos - y * sin, x * sin + y * cos]);
+}
+
+function computeFlatspuntPoints(p) {
+  const { b, t } = p;
+  const pts = [[-b / 2, -t / 2], [b / 2, -t / 2], [b / 2, t / 2], [-b / 2, t / 2]];
+  // X-aksen = øst, og nord tilsvarer negativ Z-akse i scenen (se rørimport-konvensjonen).
+  // rot oppgis som kompassretning (grader med klokka fra nord) — konverter til matematisk
+  // vinkel (grader mot klokka fra X/øst-aksen) som rotatePoints forventer.
+  const bearing = p.rot || 0;
+  const mathDeg = 90 - bearing;
+  return rotatePoints(pts, mathDeg);
+}
+
+function extrudeFromPolygon(pts, height) {
+  const shape = new THREE.Shape();
+  pts.forEach(([x, y], i) => { if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y); });
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false, curveSegments: 1 });
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, -height, 0); // origo = topp, geometrien strekker seg nedover (som rør/peler)
+  return geo;
 }
 
 function addObject() {
   const type = typeSel.value;
   const p = getParamVals();
+
+  if (type === 'flatspunt') {
+    if (p.t <= 0 || p.b <= 0 || p.t >= p.b) {
+      alert('Ugyldig flatspunt — tykkelse og bredde må være større enn 0, og tykkelsen mindre enn bredden.');
+      return;
+    }
+    p.profilePoints = computeFlatspuntPoints(p);
+  }
+
   const geo = buildGeometry(type, p);
   const color = document.getElementById('color').value || '#4fb0ae';
   const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), metalness: 0.15, roughness: 0.55 });
@@ -508,7 +600,11 @@ function addObject() {
   const ifcType = document.getElementById('ifcType').value;
   const props = draftProps.filter(pr => pr.k.trim() !== '');
 
-  objects.push({ id, mesh, type, params: p, name, ifcType, props, color });
+  // Ryddig visning i liste/detaljpanel — punktlisten (rå tekst/array) vises ikke som et generisk "dims"-felt
+  let displayParams = p;
+  if (type === 'flatspunt') displayParams = { b: p.b, t: p.t, rot: p.rot || 0, h: p.h };
+
+  objects.push({ id, mesh, type, params: displayParams, name, ifcType, props, color, profilePoints: p.profilePoints });
   renderList();
 
   // nullstill utkast til neste objekt
@@ -542,25 +638,31 @@ function matchColumn(header) {
 
 function countChar(s, ch) { return s.split(ch).length - 1; }
 
-async function readFileAsRows(file) {
+async function readFileSheets(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'xlsx' || ext === 'xls') {
     const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array' });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '', cellDates: true });
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    const sheets = {};
+    wb.SheetNames.forEach(name => {
+      sheets[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '', cellDates: true });
+    });
+    return sheets;
   }
   const text = await file.text();
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-  if (lines.length === 0) return [];
+  if (lines.length === 0) return { __default__: [] };
   const delims = [',', ';', '\t'];
   const counts = delims.map(d => countChar(lines[0], d));
   const delim = counts.every(c => c === 0) ? ',' : delims[counts.indexOf(Math.max(...counts))];
-  const decimalComma = delim === ';'; // vanlig ved norsk Excel-eksport
-  return lines.map(line => line.split(delim).map(c => {
-    const v = c.trim();
-    return decimalComma ? v : v;
-  }));
+  const rows = lines.map(line => line.split(delim).map(c => c.trim()));
+  return { __default__: rows }; // txt/csv har ingen faner — bare ett datasett
+}
+
+// Finn en fane hvis navn inneholder søkestrengen (case-insensitiv), ellers null
+function findSheet(sheets, nameFragment) {
+  const key = Object.keys(sheets).find(n => n.toLowerCase().includes(nameFragment.trim().toLowerCase()));
+  return key ? sheets[key] : null;
 }
 
 function colLetterToIndex(letter) {
@@ -722,6 +824,7 @@ document.getElementById('recenterBtn').addEventListener('click', () => {
 
 const ROCK_COLOR = '#8C8C8C'; // steingrå, for bergsegment
 const STEEL_CORE_COLOR = '#2E6FDE'; // blå, for massiv stålkjerne (t=0)
+const FLATSPUNT_COLOR = '#5B7C99'; // stålblå-grå, for flatspunt
 
 function addPipeSegment({ x, y, z, od, t, h, name, color, props }) {
   const geo = buildGeometry('tube', { od, t, h, seg: 32 });
@@ -857,6 +960,109 @@ function buildBergSurface() {
 }
 document.getElementById('bergSurfaceBtn').addEventListener('click', buildBergSurface);
 
+// --- Spuntprotokoll: parsing og objektopprettelse for flatspunt ---
+function rowsToSpunt(rows) {
+  const errors = [];
+  if (!rows || rows.length === 0) return { spunts: [], errors: ['Tomt ark'] };
+
+  const num = (v) => {
+    if (v === undefined || v === null || v === '') return NaN;
+    if (typeof v === 'number') return v;
+    return parseFloat(String(v).replace(',', '.'));
+  };
+
+  const letterFields = {
+    x: document.getElementById('spColEast').value,
+    y: document.getElementById('spColNorth').value,
+    z: document.getElementById('spColZ').value,
+    b: document.getElementById('spColB').value,
+    t: document.getElementById('spColT').value,
+    rot: document.getElementById('spColRot').value,
+    h: document.getElementById('spColL').value,
+  };
+  const mmToM = document.getElementById('spMmToM').checked;
+
+  const colMap = {};
+  Object.entries(letterFields).forEach(([key, letter]) => {
+    const idx = colLetterToIndex(letter);
+    if (idx !== undefined) colMap[key] = idx;
+  });
+
+  if (colMap.x === undefined || colMap.y === undefined || colMap.b === undefined ||
+      colMap.t === undefined || colMap.h === undefined) {
+    return { spunts: [], errors: ['Fant ikke nødvendige kolonner (Øst, Nord, bredde, tykkelse, lengde)'] };
+  }
+
+  const headerRow = rows[0];
+  const dataRows = rows.slice(1);
+  const usedCols = new Set(Object.values(colMap));
+  const nameColIdx = headerRow.findIndex((h, i) => !usedCols.has(i) && h && /\bid\b|navn|name|element/i.test(String(h)));
+
+  const spunts = [];
+  dataRows.forEach((row, i) => {
+    if (!row || row.every(c => c === '' || c === undefined || c === null)) return;
+    const x = num(row[colMap.x]);
+    const y = num(row[colMap.y]);
+    const z = colMap.z !== undefined ? num(row[colMap.z]) : 0;
+    let b = num(row[colMap.b]);
+    let t = num(row[colMap.t]);
+    const rot = colMap.rot !== undefined ? num(row[colMap.rot]) : 0;
+    const h = num(row[colMap.h]);
+    if ([x, y, b, t, h].some(v => isNaN(v)) || b <= 0 || t <= 0 || h <= 0) {
+      errors.push(`Rad ${i + 1}: ugyldige verdier, hoppet over`);
+      return;
+    }
+    if (mmToM) { b = Math.round(b / 1000 * 1e6) / 1e6; t = Math.round(t / 1000 * 1e6) / 1e6; }
+    if (t >= b) {
+      errors.push(`Rad ${i + 1}: tykkelse ≥ bredde, hoppet over`);
+      return;
+    }
+
+    const name = nameColIdx >= 0 && row[nameColIdx] !== '' && row[nameColIdx] != null
+      ? formatCellValue(row[nameColIdx]).trim() : null;
+
+    const props = [];
+    headerRow.forEach((hh, ci) => {
+      if (usedCols.has(ci)) return;
+      if (!hh || String(hh).trim() === '') return;
+      const val = row[ci];
+      if (val === undefined || val === null || val === '') return;
+      props.push({ k: String(hh).trim(), v: formatCellValue(val) });
+    });
+
+    spunts.push({ x, y, z: isNaN(z) ? 0 : z, b, t, rot: isNaN(rot) ? 0 : rot, h, name, extraProps: props });
+  });
+  return { spunts, errors };
+}
+
+function addFlatspuntFromData(data, i) {
+  const { x, y, z, b, t, rot, h, name, extraProps } = data;
+  const pts = computeFlatspuntPoints({ b, t, rot });
+  const geo = extrudeFromPolygon(pts, h);
+  const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(FLATSPUNT_COLOR), metalness: 0.2, roughness: 0.5 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x - worldOrigin.e, z - worldOrigin.h, -(y - worldOrigin.n));
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
+  mesh.add(edges);
+  scene.add(mesh);
+
+  const id = idCounter++;
+  mesh.userData.id = id;
+  objects.push({
+    id, mesh, type: 'flatspunt', params: { b: +b.toFixed(4), t: +t.toFixed(4), rot, h: +h.toFixed(4) },
+    name: name || `Spunt_${i + 1}`,
+    ifcType: 'IFCWALL',
+    worldPos: { x, y, z },
+    profilePoints: pts,
+    color: FLATSPUNT_COLOR,
+    props: [
+      { k: 'Øst (X)', v: String(x) }, { k: 'Nord (Y)', v: String(y) }, { k: 'Kote topp (Z)', v: String(z) },
+      { k: 'Bredde [m]', v: String(b) }, { k: 'Tykkelse [m]', v: String(t) }, { k: 'Retning [grader]', v: String(rot) },
+      ...(extraProps || []),
+    ],
+  });
+}
+
 document.getElementById('pipeFile').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   const statusEl = document.getElementById('importStatus');
@@ -864,16 +1070,41 @@ document.getElementById('pipeFile').addEventListener('change', async (e) => {
   statusEl.style.color = 'var(--text-dim)';
   statusEl.textContent = 'Leser fil...';
   try {
-    const rows = await readFileAsRows(file);
-    const { pipes, errors } = rowsToPipes(rows);
+    const sheets = await readFileSheets(file);
+    const isMultiSheet = !sheets.__default__;
 
-    pipes.forEach((p, i) => addPipeFromData(p, objects.length + i));
+    // Rørprotokoll: bruk navngitt fane hvis funnet (xlsx), ellers fall tilbake på hele/eneste datasettet
+    // (bakoverkompatibelt med eldre filer uten navngitte faner, eller txt/csv).
+    let pipeRows = isMultiSheet ? findSheet(sheets, document.getElementById('pipeSheetName').value) : sheets.__default__;
+    if (!pipeRows && isMultiSheet && Object.keys(sheets).length === 1) {
+      pipeRows = Object.values(sheets)[0];
+    }
+    const spuntRows = isMultiSheet ? findSheet(sheets, document.getElementById('spuntSheetName').value) : null;
+
+    let pipeCount = 0, spuntCount = 0, allErrors = [];
+
+    if (pipeRows) {
+      const { pipes, errors } = rowsToPipes(pipeRows);
+      pipes.forEach((p, i) => addPipeFromData(p, objects.length + i));
+      pipeCount = pipes.length;
+      allErrors = allErrors.concat(errors);
+    }
+    if (spuntRows) {
+      const { spunts, errors } = rowsToSpunt(spuntRows);
+      spunts.forEach((s, i) => addFlatspuntFromData(s, objects.length + i));
+      spuntCount = spunts.length;
+      allErrors = allErrors.concat(errors);
+    }
+
     renderList();
-    let msg = `${pipes.length} rør importert`;
-    if (errors.length) msg += ` · ${errors.length} rad(er) hoppet over`;
-    statusEl.textContent = msg;
-    statusEl.style.color = pipes.length > 0 ? 'var(--accent)' : '#d9645f';
-    if (pipes.length > 0) fitViewToObjects();
+    const parts = [];
+    if (pipeRows || !isMultiSheet) parts.push(`${pipeCount} rør`);
+    if (isMultiSheet) parts.push(spuntRows ? `${spuntCount} spunt` : `spuntfane ikke funnet`);
+    let msg = parts.join(' · ');
+    if (allErrors.length) msg += ` · ${allErrors.length} rad(er) hoppet over`;
+    statusEl.textContent = msg || 'Ingen data funnet';
+    statusEl.style.color = (pipeCount + spuntCount) > 0 ? 'var(--accent)' : '#d9645f';
+    if (pipeCount + spuntCount > 0) fitViewToObjects();
   } catch (err) {
     statusEl.textContent = 'Kunne ikke lese filen: ' + err.message;
     statusEl.style.color = '#d9645f';
@@ -1057,6 +1288,17 @@ function exportIFC() {
       const extrudeAx = E(`IFCAXIS2PLACEMENT3D(#${origin},$,$)`);
       const dir = E(`IFCDIRECTION((0.,0.,-1.))`); // origo = topp av røret, strekker seg nedover
       geomId = E(`IFCEXTRUDEDAREASOLID(#${profile},#${extrudeAx},#${dir},${F(h)})`);
+    } else if (o.type === 'flatspunt') {
+      repType = 'SweptSolid';
+      const h = o.params.h;
+      const pts = o.profilePoints;
+      const ptIds = pts.map(([px, py]) => E(`IFCCARTESIANPOINT((${F(px)},${F(py)}))`));
+      const closedRefs = [...ptIds, ptIds[0]].map(i => '#' + i).join(','); // eksplisitt lukket løkke
+      const polylineId = E(`IFCPOLYLINE((${closedRefs}))`);
+      const profile = E(`IFCARBITRARYCLOSEDPROFILEDEF(.AREA.,$,#${polylineId})`);
+      const extrudeAx = E(`IFCAXIS2PLACEMENT3D(#${origin},$,$)`);
+      const dir = E(`IFCDIRECTION((0.,0.,-1.))`); // origo = topp, strekker seg nedover
+      geomId = E(`IFCEXTRUDEDAREASOLID(#${profile},#${extrudeAx},#${dir},${F(h)})`);
     } else if (o.type === 'surface') {
       repType = 'Tessellation';
       const posAttr = o.mesh.geometry.attributes.position;
@@ -1127,6 +1369,266 @@ END-ISO-10303-21;
 }
 
 document.getElementById('exportIfcBtn').addEventListener('click', exportIFC);
+
+// --- DXF-eksport (AutoCAD/Civil 3D) — 3DFACE-trekanter, ett lag per objekt, ekte RGB-farge ---
+// Bygger "enhets"-geometri (høyde=1, urotert) for en gitt tverrsnittstype/parametersett,
+// konvertert til samme verdens-akser som resten av DXF-eksporten — men UTEN posisjonsforskyvning.
+// Brukes som grunnlag for gjenbrukbare BLOCK-definisjoner (se exportDXF).
+function buildUnitBlockTriangles(kind, params) {
+  let geo;
+  if (kind === 'tube') {
+    geo = buildGeometry('tube', { od: params.od, t: params.t, h: 1, seg: 14 }); // redusert segmenttall for mindre filstørrelse
+  } else if (kind === 'flatspunt') {
+    // Rå, helt urotert rektangelform (mathDeg=0) — INSERT-rotasjonen (90-bæring) legges på ved
+    // innsetting. Går bevisst UTENOM computeFlatspuntPoints, siden den allerede konverterer
+    // bæring->matematisk vinkel internt, noe som ville gitt dobbel rotasjon her.
+    const pts = [[-params.b / 2, -params.t / 2], [params.b / 2, -params.t / 2], [params.b / 2, params.t / 2], [-params.b / 2, params.t / 2]];
+    geo = extrudeFromPolygon(pts, 1);
+  } else {
+    return [];
+  }
+  const posAttr = geo.attributes.position;
+  const index = geo.index;
+  const getVertex = (i) => ({ x: posAttr.getX(i), y: -posAttr.getZ(i), z: posAttr.getY(i) });
+  const triCount = index ? index.count / 3 : posAttr.count / 3;
+  const tris = [];
+  for (let t = 0; t < triCount; t++) {
+    let i0, i1, i2;
+    if (index) { i0 = index.array[t * 3]; i1 = index.array[t * 3 + 1]; i2 = index.array[t * 3 + 2]; }
+    else { i0 = t * 3; i1 = t * 3 + 1; i2 = t * 3 + 2; }
+    tris.push([getVertex(i0), getVertex(i1), getVertex(i2)]);
+  }
+  return tris;
+}
+
+function getObjectWorldTriangles(o, bake) {
+  const tris = [];
+  if (o.type === 'surface') {
+    const idx = o.surfaceTriangles;
+    let verts;
+    if (bake && o.surfaceWorldVerts) {
+      verts = o.surfaceWorldVerts.map(v => ({ x: v.x, y: v.y, z: v.z }));
+    } else {
+      const posAttr = o.mesh.geometry.attributes.position;
+      verts = [];
+      for (let i = 0; i < posAttr.count; i++) {
+        verts.push({ x: posAttr.getX(i), y: -posAttr.getZ(i), z: posAttr.getY(i) });
+      }
+    }
+    for (let i = 0; i < idx.length; i += 3) {
+      tris.push([verts[idx[i]], verts[idx[i + 1]], verts[idx[i + 2]]]);
+    }
+    return tris;
+  }
+
+  const geo = o.mesh.geometry;
+  const posAttr = geo.attributes.position;
+  const index = geo.index;
+  const getVertex = (i) => {
+    const lx = posAttr.getX(i), ly = posAttr.getY(i), lz = posAttr.getZ(i);
+    const wx = lx + o.mesh.position.x, wy = ly + o.mesh.position.y, wz = lz + o.mesh.position.z;
+    return {
+      x: wx + (bake ? worldOrigin.e : 0),
+      y: -wz + (bake ? worldOrigin.n : 0),
+      z: wy + (bake ? worldOrigin.h : 0),
+    };
+  };
+  const triCount = index ? index.count / 3 : posAttr.count / 3;
+  for (let t = 0; t < triCount; t++) {
+    let i0, i1, i2;
+    if (index) { i0 = index.array[t * 3]; i1 = index.array[t * 3 + 1]; i2 = index.array[t * 3 + 2]; }
+    else { i0 = t * 3; i1 = t * 3 + 1; i2 = t * 3 + 2; }
+    tris.push([getVertex(i0), getVertex(i1), getVertex(i2)]);
+  }
+  return tris;
+}
+
+// Et utvalg av standard AutoCAD Color Index (ACI)-referansefarger. R12-formatet støtter ikke ekte
+// RGB-farger (kun 255-fargers palett), så vi finner nærmeste ACI-farge til objektets faktiske farge.
+const ACI_PALETTE = {
+  1: [255, 0, 0], 2: [255, 255, 0], 3: [0, 255, 0], 4: [0, 255, 255], 5: [0, 0, 255],
+  6: [255, 0, 255], 7: [255, 255, 255], 8: [65, 65, 65], 9: [153, 153, 153],
+  30: [255, 127, 0], 32: [255, 191, 0], 40: [191, 95, 0], 100: [165, 165, 255],
+  150: [0, 127, 255], 170: [0, 76, 153],
+  250: [51, 51, 51], 251: [102, 102, 102], 253: [178, 178, 178], 254: [229, 229, 229], 255: [255, 255, 255],
+};
+
+function hexToAci(hex) {
+  const c = new THREE.Color(hex);
+  const r = Math.round(c.r * 255), g = Math.round(c.g * 255), b = Math.round(c.b * 255);
+  let best = 7, bestDist = Infinity;
+  for (const [idx, [pr, pg, pb]] of Object.entries(ACI_PALETTE)) {
+    const d = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
+    if (d < bestDist) { bestDist = d; best = +idx; }
+  }
+  return best;
+}
+
+function sanitizeLayerName(name) {
+  const translit = String(name)
+    .replace(/æ/g, 'ae').replace(/Æ/g, 'AE')
+    .replace(/ø/g, 'o').replace(/Ø/g, 'O')
+    .replace(/å/g, 'a').replace(/Å/g, 'A');
+  return translit.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 60) || 'OBJEKT';
+}
+
+function exportDXF() {
+  if (objects.length === 0) return;
+  const bakeWorldCoords = document.getElementById('bakeWorldCoords').checked;
+  const F = (v) => v.toFixed(4);
+  const lines = [];
+  const P = (code, val) => { lines.push(String(code), String(val)); };
+
+  // Ett lag per objekt (unikt navn), for å kunne skru av/på og filtrere per element i CAD
+  const usedLayerNames = new Set();
+  const layers = objects.map(o => {
+    let base = sanitizeLayerName(o.name || o.type);
+    let name = base, n = 1;
+    while (usedLayerNames.has(name)) { name = `${base}_${n++}`; }
+    usedLayerNames.add(name);
+    return { obj: o, name, aci: hexToAci(o.color || PIPE_COLOR) };
+  });
+
+  // Grupper rør/flatspunt med identisk tverrsnitt (avrundet til mm) — disse kan dele én
+  // BLOCK-definisjon og settes inn på nytt per forekomst (posisjon + lengde via Z-skalering
+  // + evt. rotasjon), i stedet for å gjenta alle trekantene for hvert eneste objekt.
+  const round = (v) => Math.round(v * 1000) / 1000;
+  function blockKeyFor(o) {
+    if (o.type === 'tube') return `tube_${round(o.params.od)}_${round(o.params.t)}`;
+    if (o.type === 'flatspunt') return `flatspunt_${round(o.params.b)}_${round(o.params.t)}`;
+    return null;
+  }
+  const groupCounts = {};
+  layers.forEach(({ obj }) => {
+    const key = blockKeyFor(obj);
+    if (key) groupCounts[key] = (groupCounts[key] || 0) + 1;
+  });
+  const blockDefs = {}; // key -> { name, triangles }
+  let blockCounter = 0;
+  Object.keys(groupCounts).forEach(key => {
+    if (groupCounts[key] < 2) return; // kun ett objekt i gruppen — ikke verdt blokk-indireksjonen
+    blockCounter++;
+    blockDefs[key] = { name: `BLK_${blockCounter}` };
+  });
+
+  const entityLines = [];
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  const trackBounds = (p) => {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
+  };
+
+  layers.forEach(({ obj, name, aci }) => {
+    const key = blockKeyFor(obj);
+    const block = key ? blockDefs[key] : null;
+
+    if (block) {
+      // INSERT av delt blokk: posisjon = objektets plasseringspunkt, Z-skalering = lengde,
+      // rotasjon = kun relevant for flatspunt (rør er rotasjonssymmetriske).
+      const pos = obj.mesh.position;
+      const ix = pos.x + (bakeWorldCoords ? worldOrigin.e : 0);
+      const iy = -pos.z + (bakeWorldCoords ? worldOrigin.n : 0);
+      const iz = pos.y + (bakeWorldCoords ? worldOrigin.h : 0);
+      const height = obj.params.h;
+      const rotDeg = obj.type === 'flatspunt' ? (90 - (obj.params.rot || 0)) : 0;
+
+      // Bounding box: estimer grovt via blokkens enhets-trekanter skalert til faktisk størrelse,
+      // så $EXTMIN/$EXTMAX fortsatt dekker hele modellen selv om objektet er en INSERT.
+      if (!block.triangles) block.triangles = buildUnitBlockTriangles(obj.type, obj.params);
+      const rad = rotDeg * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+      block.triangles.forEach(tri => tri.forEach(v => {
+        const sx = v.x * cos - v.y * sin, sy = v.x * sin + v.y * cos; // roter i XY-planet
+        trackBounds({ x: ix + sx, y: iy + sy, z: iz + v.z * height });
+      }));
+
+      entityLines.push(
+        '0', 'INSERT', '8', name, '62', String(aci), '2', block.name,
+        '10', F(ix), '20', F(iy), '30', F(iz),
+        '41', '1', '42', '1', '43', F(height),
+        '50', F(rotDeg),
+      );
+      return;
+    }
+
+    // Ikke del av en blokk-gruppe (kun ett objekt av sitt slag, eller annen geometritype) —
+    // skriv rå 3DFACE-trekanter som før.
+    const tris = getObjectWorldTriangles(obj, bakeWorldCoords);
+    tris.forEach(([a, b, c]) => {
+      [a, b, c].forEach(trackBounds);
+      entityLines.push(
+        '0', '3DFACE', '8', name, '62', String(aci),
+        '10', F(a.x), '20', F(a.y), '30', F(a.z),
+        '11', F(b.x), '21', F(b.y), '31', F(b.z),
+        '12', F(c.x), '22', F(c.y), '32', F(c.z),
+        '13', F(c.x), '23', F(c.y), '33', F(c.z),
+      );
+    });
+  });
+
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const viewHeight = Math.max(maxX - minX, maxY - minY, 1) * 1.2; // litt margin rundt modellen
+
+  // DXF R12 (AC1009) — eldre, men den desidert mest universelt kompatible DXF-varianten.
+  // Ingen handles, block-records eller subclass-markører nødvendig, i motsetning til nyere versjoner.
+  P(0, 'SECTION'); P(2, 'HEADER');
+  P(9, '$ACADVER'); P(1, 'AC1009');
+  P(9, '$EXTMIN'); P(10, F(minX)); P(20, F(minY)); P(30, F(minZ));
+  P(9, '$EXTMAX'); P(10, F(maxX)); P(20, F(maxY)); P(30, F(maxZ));
+  P(0, 'ENDSEC');
+
+  P(0, 'SECTION'); P(2, 'TABLES');
+  P(0, 'TABLE'); P(2, 'LAYER'); P(70, layers.length);
+  layers.forEach(({ name, aci }) => {
+    P(0, 'LAYER'); P(2, name); P(70, 0); P(62, aci); P(6, 'CONTINUOUS');
+  });
+  P(0, 'ENDTAB');
+  // VPORT — setter startvisningen sentrert og zoomet til modellen (viktig når koordinatene
+  // er store verdenskoordinater, ellers kan modellen ligge langt utenfor standard-visningsområdet)
+  P(0, 'TABLE'); P(2, 'VPORT'); P(70, 1);
+  P(0, 'VPORT'); P(2, '*ACTIVE'); P(70, 0);
+  P(10, '0.0'); P(20, '0.0'); P(11, '1.0'); P(21, '1.0');
+  P(12, F(cx)); P(22, F(cy)); P(13, '0.0'); P(23, '0.0');
+  P(14, '1.0'); P(24, '1.0'); P(15, '1.0'); P(25, '1.0');
+  P(16, '0.0'); P(26, '0.0'); P(36, '1.0');
+  P(17, F(cx)); P(27, F(cy)); P(37, '0.0');
+  P(40, F(viewHeight)); P(41, '1.0'); P(42, '50.0'); P(43, '0.0'); P(44, '0.0');
+  P(50, '0.0'); P(51, '0.0'); P(71, 0); P(72, 100); P(73, 1); P(74, 3);
+  P(75, 0); P(76, 0); P(77, 0); P(78, 0);
+  P(0, 'ENDTAB');
+  P(0, 'ENDSEC');
+
+  // BLOCKS — hver delte tverrsnittsform defineres én gang her, på lag "0" med BYLAYER-farge
+  // (62=256), slik at hver INSERT arver fargen fra sitt eget lag.
+  P(0, 'SECTION'); P(2, 'BLOCKS');
+  Object.values(blockDefs).forEach(block => {
+    P(0, 'BLOCK'); P(8, '0'); P(2, block.name); P(70, 0);
+    P(10, '0.0'); P(20, '0.0'); P(30, '0.0'); P(3, block.name); P(1, '');
+    block.triangles.forEach(([a, b, c]) => {
+      P(0, '3DFACE'); P(8, '0'); P(62, 256);
+      P(10, F(a.x)); P(20, F(a.y)); P(30, F(a.z));
+      P(11, F(b.x)); P(21, F(b.y)); P(31, F(b.z));
+      P(12, F(c.x)); P(22, F(c.y)); P(32, F(c.z));
+      P(13, F(c.x)); P(23, F(c.y)); P(33, F(c.z));
+    });
+    P(0, 'ENDBLK'); P(8, '0');
+  });
+  P(0, 'ENDSEC');
+
+  P(0, 'SECTION'); P(2, 'ENTITIES');
+  entityLines.forEach(l => lines.push(l));
+  P(0, 'ENDSEC');
+  P(0, 'EOF');
+
+  const content = lines.join('\n');
+  const blob = new Blob([content], { type: 'text/plain' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'modell.dxf';
+  link.click();
+}
+document.getElementById('exportDxfBtn').addEventListener('click', exportDXF);
 renderList(); // vis tom liste ved oppstart (ingen forhåndsmodellert objekt)
 </script>
 </body>
