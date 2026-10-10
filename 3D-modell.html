@@ -51,12 +51,10 @@
     padding: 9px 10px; cursor: pointer; transition: border-color .15s, color .15s;
   }
   button:hover { border-color: var(--accent); color: var(--accent); }
-  #addBtn { width: 100%; margin-top: 6px; background: var(--accent); color: #08201f; border: none; font-weight: 600; }
-  #addBtn:hover { opacity: .88; color: #08201f; }
 
   hr { border: none; border-top: 1px solid var(--line); margin: 16px 0; }
 
-  #objList { flex: 1; overflow-y: auto; }
+  #objList { max-height: 280px; overflow-y: auto; }
   .obj-item {
     display: flex; justify-content: space-between; align-items: center;
     padding: 8px 9px; border: 1px solid var(--line); border-radius: 4px; margin-bottom: 6px;
@@ -85,6 +83,7 @@
   }
   .meta-row span:first-child { color: var(--text-dim); }
   #canvasWrap canvas { cursor: pointer; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
 
   #exportRow { display:flex; gap: 8px; margin-top: 10px; }
   #exportRow button { flex: 1; }
@@ -99,6 +98,40 @@
   }
   #hud b { color: var(--accent); }
 
+
+  /* --- Inndeling av panelet i seksjoner --- */
+  details.sec { border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); margin-bottom: 10px; }
+  details.sec > summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 9px;
+    padding: 10px 11px; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text); user-select: none;
+  }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary .num {
+    display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px;
+    border-radius: 50%; background: var(--accent); color: #08201f; font-size: 10.5px; font-weight: 700; letter-spacing: 0;
+  }
+  details.sec > summary::after { content: '▸'; margin-left: auto; color: var(--text-dim); transition: transform .15s; }
+  details.sec[open] > summary::after { transform: rotate(90deg); }
+  details.sec[open] > summary { border-bottom: 1px solid var(--line); }
+  details.sec .body { padding: 12px 11px 4px; background: var(--panel); border-radius: 0 0 6px 6px; }
+  .sub-h {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent); margin: 4px 0 8px; padding-bottom: 4px; border-bottom: 1px dashed var(--line);
+  }
+  .sub-h:not(:first-child) { margin-top: 16px; }
+  .check { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 9px; }
+  .check input { width: auto; margin-top: 2px; }
+  .check label { margin: 0 !important; font-size: 11px !important; line-height: 1.4; cursor: pointer; }
+  .hint { font-family: var(--mono); font-size: 10px; color: var(--text-dim); line-height: 1.5; margin: -2px 0 10px; }
+  .status { font-family: var(--mono); font-size: 10.5px; color: var(--accent); margin: 6px 0 4px; min-height: 14px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .row3 .cap { font-family: var(--mono); font-size: 9.5px; color: var(--text-dim); margin-bottom: 3px; text-align: center; }
+  .expgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .expgrid button { padding: 10px 4px; }
+  #clearBtn { color: var(--text-dim); }
+  #clearBtn:hover { color: #d9645f; border-color: #d9645f; }
+
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
 </style>
@@ -109,190 +142,146 @@
     <h1>parametrisk<span>_3d</span></h1>
     <div class="sub">generer geometri fra tall — ingen tung CAD nødvendig</div>
 
-    <div class="field">
-      <label>importer fra fil (txt / csv / xlsx) — leser begge faner i samme arbeidsbok</label>
-      <input type="file" id="pipeFile" accept=".txt,.csv,.xlsx,.xls">
-      <div id="importStatus" style="font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); margin-top: 5px;"></div>
-      <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 6px; line-height: 1.5;">
-        resten av kolonnene blir egenskaper på hvert element. tom/0 tykkelse i rørprotokollen gir massiv sylinder (f.eks. stålkjerne).
+    <details class="sec" open>
+      <summary><span class="num">1</span>Import</summary>
+      <div class="body">
+        <div class="field">
+          <label>Excel-protokoll (xlsx) — leser rør- og spuntfane i samme arbeidsbok</label>
+          <input type="file" id="pipeFile" accept=".txt,.csv,.xlsx,.xls">
+        </div>
+        <div class="status" id="importStatus"></div>
+        <div class="hint">Resten av kolonnene blir egenskaper på hvert element. Tom/0 tykkelse i rørprotokollen gir massiv sylinder (f.eks. stålkjerne).</div>
+
+        <div class="sub-h">Rørprotokoll</div>
+        <div class="field">
+          <label>fanenavn</label>
+          <input type="text" id="pipeSheetName" value="Utklipp rørprotokoll">
+        </div>
+        <div class="check"><input type="checkbox" id="splitSegments" checked><label for="splitSegments">del rør i løsmasse-/bergsegment (ulik farge)</label></div>
+        <div class="check"><input type="checkbox" id="mmToM" checked><label for="mmToM">diameter/tykkelse oppgitt i mm</label></div>
+
+        <div class="sub-h">Spuntprotokoll</div>
+        <div class="field">
+          <label>fanenavn</label>
+          <input type="text" id="spuntSheetName" value="Utklipp spuntprotokoll">
+        </div>
+        <div class="check"><input type="checkbox" id="spMmToM" checked><label for="spMmToM">bredde/tykkelse oppgitt i mm</label></div>
       </div>
-    </div>
+    </details>
 
-    <div class="field">
-      <label style="color: var(--accent);">rørprotokoll — fane</label>
-      <input type="text" id="pipeSheetName" value="Utklipp rørprotokoll">
-    </div>
-
-    <div class="field">
-      <label>kolonnebokstaver, rørprotokoll — la stå tomt for auto-gjenkjenning</label>
-      <div class="row" style="margin-bottom:6px;">
-        <input type="text" id="colOD" placeholder="OD" title="Ytre diameter" value="C">
-        <input type="text" id="colT" placeholder="Tykk." title="Tykkelse" value="D">
-        <input type="text" id="colZ" placeholder="Kote" title="Kote topp (Z)" value="E">
+    <details class="sec">
+      <summary><span class="num">2</span>IFC-import</summary>
+      <div class="body">
+        <div class="field">
+          <label>IFC-fil</label>
+          <input type="file" id="ifcFile" accept=".ifc">
+        </div>
+        <div class="status" id="ifcStatus"></div>
+        <div class="hint">Importerte IFC-modeller vises som de er. Klikk på et element i 3D-visningen for å se IFC-egenskapene. Modellene kan ikke endres eller eksporteres, og kommer ikke med i objektlisten.</div>
+        <div class="check"><input type="checkbox" id="ifcVisible" checked><label for="ifcVisible">vis importert IFC</label></div>
+        <button id="ifcClearBtn" type="button" style="width:100%; margin-bottom:10px;">fjern importert IFC</button>
       </div>
-      <div class="row">
-        <input type="text" id="colNorth" placeholder="Nord" title="Nord-koordinat" value="F">
-        <input type="text" id="colEast" placeholder="Øst" title="Øst-koordinat" value="G">
-        <input type="text" id="colL" placeholder="Lengde" title="Total lengde" value="H">
+    </details>
+
+    <details class="sec">
+      <summary><span class="num">3</span>Koordinatsystem</summary>
+      <div class="body">
+        <div class="sub-h">Georeferanse (IFC)</div>
+        <div class="field">
+          <label>koordinatsystem</label>
+          <input type="text" id="crsName" value="NTM10" placeholder="f.eks. NTM10, EPSG:5110">
+        </div>
+        <div class="field">
+          <label>geodetisk datum</label>
+          <input type="text" id="crsDatum" value="EUREF89">
+        </div>
+        <div class="field">
+          <label>rotasjon av akse (grader fra nord)</label>
+          <input type="number" id="crsRot" value="0" step="0.1">
+        </div>
+        <div class="hint">Dreier modellens akser i forhold til koordinatsystemet i IFC (IfcMapConversion). Påvirker ikke geometrien i visningen, STL eller DXF. Normalt 0.</div>
+
+        <div class="sub-h">Origo i 3D-visningen</div>
+        <div class="field">
+          <div class="row3">
+            <div><div class="cap">Øst</div><input type="number" id="crsE" value="0" step="0.01"></div>
+            <div><div class="cap">Nord</div><input type="number" id="crsN" value="0" step="0.01"></div>
+            <div><div class="cap">Kote</div><input type="number" id="crsH" value="0" step="0.01"></div>
+          </div>
+          <button id="recenterBtn" type="button" style="width:100%; margin-top:8px;">flytt objekter nær origo (tyngdepunkt)</button>
+        </div>
+        <div class="hint">Origo er 0 som standard, og objektene ligger da direkte på koordinatene fra fila. Sett origo kun for å forskyve modellen nærmere (0,0,0). Offset skrives uansett til IFC.</div>
+        <div class="check"><input type="checkbox" id="bakeWorldCoords"><label for="bakeWorldCoords">skriv absolutte verdenskoordinater direkte i IFC-plasseringene (i stedet for lokal origo + offset)</label></div>
       </div>
-      <div class="row" style="margin-top:6px;">
-        <input type="text" id="colBerg" placeholder="Berg" title="Lengde i berg" value="I">
-        <input type="text" id="colLosmasse" placeholder="Løsm." title="Lengde i løsmasser" value="J">
+    </details>
+
+    <details class="sec">
+      <summary><span class="num">4</span>Bergoverflate</summary>
+      <div class="body">
+        <button id="bergSurfaceBtn" type="button" style="width:100%;">lag bergoverflate (TIN) fra bergpunktene</button>
+        <div class="status" id="bergSurfaceStatus" style="color: var(--text-dim);"></div>
       </div>
-    </div>
+    </details>
 
-    <div class="field" style="display:flex; align-items:center; gap:8px;">
-      <input type="checkbox" id="splitSegments" checked style="width:auto;">
-      <label style="margin:0; font-size:11px;">del rør i løsmasse-/bergsegment (ulik farge) når kolonnene over er fylt ut</label>
-    </div>
+    <details class="sec">
+      <summary><span class="num">5</span>Infoflagg (Element-ID)</summary>
+      <div class="body">
+        <div class="sub-h">Visning i 3D</div>
+        <div class="check"><input type="checkbox" id="flagToggle" checked><label for="flagToggle">vis Element-ID-flagg på toppen av hvert element</label></div>
+        <div class="field">
+          <label>flaggstørrelse</label>
+          <input type="range" id="flagSize" min="0.4" max="3" step="0.1" value="1">
+        </div>
+        <div class="check"><input type="checkbox" id="flagWorldScale"><label for="flagWorldScale">skaler flagg med avstand (små på avstand, store når du zoomer inn)</label></div>
 
-    <div class="field" style="display:flex; align-items:center; gap:8px;">
-      <input type="checkbox" id="mmToM" checked style="width:auto;">
-      <label style="margin:0; font-size:11px;">diameter/tykkelse (rørprotokoll) oppgitt i mm</label>
-    </div>
-
-    <hr>
-
-    <div class="field">
-      <label style="color: var(--accent);">spuntprotokoll — fane</label>
-      <input type="text" id="spuntSheetName" value="Utklipp spuntprotokoll">
-    </div>
-
-    <div class="field">
-      <label>kolonnebokstaver, spuntprotokoll</label>
-      <div class="row" style="margin-bottom:6px;">
-        <input type="text" id="spColB" placeholder="Bredde" title="Bredde spunt" value="C">
-        <input type="text" id="spColT" placeholder="Tykk." title="Tykkelse spunt" value="D">
-        <input type="text" id="spColZ" placeholder="Kote" title="Kote topp (Z)" value="E">
+        <div class="sub-h">Eksport (IFC og DXF)</div>
+        <div class="check"><input type="checkbox" id="flagExport" checked><label for="flagExport">ta med Element-ID på toppen av elementet</label></div>
+        <div class="field">
+          <label>IFC-tekst som</label>
+          <select id="flagIfcMode">
+            <option value="geom" selected>fysisk flagg (3D-geometri, vises i alle visere)</option>
+            <option value="annot">IfcAnnotation (ekte tekst, støttes av få programmer)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>flaggets retning (IFC)</label>
+          <select id="flagOrient">
+            <option value="vert" selected>stående plate (leses fra syd og nord)</option>
+            <option value="horiz">liggende plate (leses ovenfra og nedenfra)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>teksthøyde (m)</label>
+          <input type="number" id="flagExportH" value="0.2" min="0.01" step="0.05">
+        </div>
       </div>
-      <div class="row" style="margin-bottom:6px;">
-        <input type="text" id="spColNorth" placeholder="Nord" title="Nord-koordinat" value="F">
-        <input type="text" id="spColEast" placeholder="Øst" title="Øst-koordinat" value="G">
-        <input type="text" id="spColRot" placeholder="Retning" title="Retning (grader, med klokka fra nord)" value="H">
+    </details>
+
+    <details class="sec" open>
+      <summary><span class="num">6</span>Objekter i scenen</summary>
+      <div class="body">
+        <div id="details"></div>
+        <div id="objList"></div>
       </div>
-      <div class="row">
-        <input type="text" id="spColL" placeholder="Lengde" title="Lengde (vertikal)" value="I">
+    </details>
+
+    <details class="sec" open>
+      <summary><span class="num">7</span>Eksport</summary>
+      <div class="body">
+        <div class="field">
+          <label>navn på eksport (filnavn uten endelse)</label>
+          <input type="text" id="exportName" value="Eksport" placeholder="Eksport">
+        </div>
+        <div class="hint">Brukes som filnavn for STL, IFC og DXF, og som prosjektnavn i IFC.</div>
+        <div class="sub-h">Last ned</div>
+        <div class="expgrid">
+          <button id="exportBtn">STL</button>
+          <button id="exportIfcBtn">IFC</button>
+          <button id="exportDxfBtn">DXF</button>
+        </div>
+        <button id="clearBtn" type="button" style="width:100%; margin-bottom:10px;">tøm scene</button>
       </div>
-      <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 6px; line-height: 1.5;">
-        antar samme kolonnemønster som rørprotokollen (kote/nord/øst i E/F/G) — juster om det avviker. lengde-kolonnen (I) er ikke bekreftet av deg ennå, sjekk gjerne at den stemmer.
-      </div>
-    </div>
-
-    <div class="field" style="display:flex; align-items:center; gap:8px;">
-      <input type="checkbox" id="spMmToM" checked style="width:auto;">
-      <label style="margin:0; font-size:11px;">bredde/tykkelse (spuntprotokoll) oppgitt i mm</label>
-    </div>
-
-    <hr>
-
-    <div class="field">
-      <label>koordinatsystem (IFC-georeferanse)</label>
-      <input type="text" id="crsName" value="NTM10" placeholder="f.eks. NTM10, EPSG:5110">
-    </div>
-    <div class="field">
-      <label>geodetisk datum</label>
-      <input type="text" id="crsDatum" value="EUREF89">
-    </div>
-    <div class="field">
-      <label>origo i koordinatsystemet (Øst / Nord / Kote)</label>
-      <div class="row">
-        <input type="number" id="crsE" value="0" step="0.01">
-        <input type="number" id="crsN" value="0" step="0.01">
-        <input type="number" id="crsH" value="0" step="0.01">
-      </div>
-      <button id="recenterBtn" type="button" style="width:100%; margin-top:6px;">flytt objekter nær origo (tyngdepunkt)</button>
-    </div>
-    <div class="field">
-      <label>rotasjon (grader fra nord)</label>
-      <input type="number" id="crsRot" value="0" step="0.1">
-    </div>
-    <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: -4px; line-height: 1.5;">
-      origo er 0 som standard — objektene plasseres da direkte på koordinatene fra fila. sett origo manuelt kun hvis du vil forskyve hele modellen nærmere (0,0,0) i 3D-visningen; offset skrives uansett til IFC via IfcMapConversion.
-    </div>
-
-    <div class="field" style="display:flex; align-items:center; gap:8px; margin-top:8px;">
-      <input type="checkbox" id="bakeWorldCoords" style="width:auto;">
-      <label style="margin:0; font-size:11px;">skriv absolutte verdenskoordinater direkte i IFC-plasseringene (i stedet for lokal origo + IfcMapConversion-offset)</label>
-    </div>
-
-    <div class="field">
-      <button id="bergSurfaceBtn" type="button" style="width:100%;">lag bergoverflate (TIN) fra bergpunktene</button>
-      <div id="bergSurfaceStatus" style="font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); margin-top: 5px;"></div>
-    </div>
-
-    <hr>
-
-    <div class="field">
-      <label>type</label>
-      <select id="type">
-        <option value="box">boks (L × B × H)</option>
-        <option value="cylinder">sylinder (r, h)</option>
-        <option value="cone">kjegle (r, h)</option>
-        <option value="sphere">kule (r)</option>
-        <option value="tube">rør (od, t, h)</option>
-        <option value="flatspunt">flatspunt (cellespunt)</option>
-      </select>
-    </div>
-
-    <div id="params"></div>
-
-    <div class="field">
-      <label>posisjon (x, y, z)</label>
-      <div class="row">
-        <input type="number" id="px" value="0" step="0.1">
-        <input type="number" id="py" value="0" step="0.1">
-        <input type="number" id="pz" value="0" step="0.1">
-      </div>
-    </div>
-
-    <div class="field">
-      <label>farge</label>
-      <input type="text" id="color" value="#4fb0ae">
-    </div>
-
-    <hr>
-
-    <div class="field">
-      <label>navn (valgfritt)</label>
-      <input type="text" id="objName" placeholder="f.eks. Fundament-1">
-    </div>
-
-    <div class="field">
-      <label>IFC-type</label>
-      <select id="ifcType">
-        <option value="IFCBUILDINGELEMENTPROXY">Generisk (Proxy)</option>
-        <option value="IFCWALL">Vegg</option>
-        <option value="IFCCOLUMN">Søyle</option>
-        <option value="IFCBEAM">Bjelke</option>
-        <option value="IFCSLAB">Dekke / plate</option>
-        <option value="IFCFOOTING">Fundament</option>
-        <option value="IFCPILE">Pæl</option>
-        <option value="IFCPIPESEGMENT">Rør</option>
-        <option value="IFCCOVERING">Kledning / belegg</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>egenskaper (Pset_Egenskaper)</label>
-      <div id="propRows"></div>
-      <button id="addPropRow" type="button" style="width:100%; margin-top:4px;">+ egenskap</button>
-    </div>
-
-    <button id="addBtn">+ legg til objekt</button>
-
-    <hr>
-    <label style="font-family: var(--mono); font-size: 11px; color: var(--text-dim);">objekter i scenen</label>
-    <div id="details"></div>
-    <div id="objList" style="margin-top:8px;"></div>
-
-    <div id="exportRow">
-      <button id="exportBtn">eksporter STL</button>
-      <button id="exportIfcBtn">eksporter IFC</button>
-    </div>
-    <div id="exportRow">
-      <button id="exportDxfBtn">eksporter DXF</button>
-      <button id="clearBtn">tøm scene</button>
-    </div>
+    </details>
   </div>
 
   <div id="canvasWrap">
@@ -302,6 +291,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/delaunator@5.1.0/delaunator.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/web-ifc@0.0.66/web-ifc-api-iife.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
@@ -309,7 +299,7 @@
   // Sjekk at bibliotekene faktisk lastet, og gi tydelig feilmelding i UI hvis ikke
   window.addEventListener('load', () => {
     if (typeof THREE === 'undefined' || !THREE.OrbitControls || !THREE.STLExporter) {
-      document.getElementById('params').innerHTML =
+      document.getElementById('importStatus').innerHTML =
         '<div style="color:#d9645f; font-family:var(--mono); font-size:11.5px;">Kunne ikke laste Three.js-biblioteker (sjekk nettforbindelse / evt. adblocker som blokkerer jsdelivr).</div>';
     }
   });
@@ -368,8 +358,132 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// --- Infoflagg: Element-ID på toppen av hvert element ---
+// Flaggene er sprites (alltid vendt mot kamera) i en egen gruppe, forankret med foten av
+// flaggstangen i toppunktet til elementet. Posisjonen synkroniseres når origo flyttes.
+const flagGroup = new THREE.Group();
+scene.add(flagGroup);
+const flagSettings = { visible: true, size: 1, worldScale: false };
+
+function makeFlagSprite(text) {
+  const fontPx = 28, padX = 14, padY = 8, stem = 20, margin = 3;
+  const font = `600 ${fontPx}px "IBM Plex Mono", "SF Mono", Consolas, monospace`;
+  const c = document.createElement('canvas');
+  let ctx = c.getContext('2d');
+  ctx.font = font;
+  const boxW = Math.ceil(ctx.measureText(text).width) + padX * 2;
+  const boxH = fontPx + padY * 2;
+  c.width = boxW + margin * 2;
+  c.height = boxH + stem + margin * 2;
+  ctx = c.getContext('2d'); // endring av canvas-størrelse nullstiller konteksten
+  ctx.font = font;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const x = margin, y = margin, r = 8;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + boxW, y, x + boxW, y + boxH, r);
+  ctx.arcTo(x + boxW, y + boxH, x, y + boxH, r);
+  ctx.arcTo(x, y + boxH, x, y, r);
+  ctx.arcTo(x, y, x + boxW, y, r);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(14,17,19,0.9)';
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#4fb0ae';
+  ctx.stroke();
+
+  // flaggstang ned til elementets toppunkt
+  const cx = c.width / 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, y + boxH);
+  ctx.lineTo(cx, c.height - margin - 3);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, c.height - margin - 3, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#4fb0ae';
+  ctx.fill();
+
+  ctx.fillStyle = '#e6eef0';
+  ctx.fillText(text, cx, y + boxH / 2 + 1);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  const mat = new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: false, depthWrite: false,
+    sizeAttenuation: flagSettings.worldScale,
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.center.set(0.5, 0); // nedre midtpunkt (tuppen av flaggstangen) ligger i ankerpunktet
+  sprite.renderOrder = 999;
+  sprite.userData.aspect = c.width / c.height;
+  return sprite;
+}
+
+function syncFlag(o) {
+  if (!o.flag) return;
+  const p = o.mesh.position;
+  o.flag.position.set(p.x, p.y + o.flagTopY, p.z);
+}
+
+function applyFlagScale(o) {
+  const f = o.flag;
+  if (!f) return;
+  const selected = o.id === selectedId;
+  // Konstant skjermstørrelse: høyde som andel av skjermen. Verdensstørrelse: høyde i meter.
+  const base = flagSettings.worldScale ? 0.9 : 0.05;
+  const h = base * flagSettings.size * (selected ? 1.3 : 1);
+  f.scale.set(h * f.userData.aspect, h, 1);
+  if (f.material.sizeAttenuation !== flagSettings.worldScale) {
+    f.material.sizeAttenuation = flagSettings.worldScale;
+    f.material.needsUpdate = true;
+  }
+  f.renderOrder = selected ? 1000 : 999;
+}
+
+function attachFlag(o, text) {
+  if (!text) return;
+  o.flagText = text;
+  o.flag = makeFlagSprite(text);
+  o.mesh.geometry.computeBoundingBox();
+  o.flagTopY = o.mesh.geometry.boundingBox.max.y; // toppen av geometrien i lokale koordinater
+  flagGroup.add(o.flag);
+  syncFlag(o);
+  applyFlagScale(o);
+}
+
+function disposeFlag(o) {
+  if (!o.flag) return;
+  flagGroup.remove(o.flag);
+  o.flag.material.map.dispose();
+  o.flag.material.dispose();
+  o.flag = null;
+}
+
+function refreshFlags() {
+  flagGroup.visible = flagSettings.visible;
+  objects.forEach(o => { syncFlag(o); applyFlagScale(o); });
+}
+
+document.getElementById('flagToggle').addEventListener('change', (e) => {
+  flagSettings.visible = e.target.checked;
+  refreshFlags();
+});
+document.getElementById('flagSize').addEventListener('input', (e) => {
+  flagSettings.size = parseFloat(e.target.value) || 1;
+  refreshFlags();
+});
+document.getElementById('flagWorldScale').addEventListener('change', (e) => {
+  flagSettings.worldScale = e.target.checked;
+  refreshFlags();
+});
+
 function selectObject(id) {
+  clearIfcSelection();
   selectedId = id;
+  objects.forEach(applyFlagScale); // valgt element får et litt større flagg
   if (selectionHelper) {
     scene.remove(selectionHelper);
     selectionHelper.geometry.dispose();
@@ -386,10 +500,12 @@ function selectObject(id) {
 }
 
 function renderDetails() {
+  if (ifcSel) { renderIfcDetails(); return; }
   const el = document.getElementById('details');
   const o = objects.find(o => o.id === selectedId);
   if (!o) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'block';
+  const sec = el.closest('details'); if (sec) sec.open = true; // vis egenskapene selv om seksjonen var lukket
   const dims = Object.entries(o.params).filter(([k]) => k !== 'seg')
     .map(([k,v]) => `<div class="meta-row"><span>${k}</span><span>${v}</span></div>`).join('');
   const propsHtml = o.props.length
@@ -427,85 +543,20 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   );
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects(objects.map(o => o.mesh), false);
-  selectObject(hits.length > 0 ? hits[0].object.userData.id : null);
+  const targets = objects.map(o => o.mesh);
+  if (ifcGroup.visible) ifcModels.forEach(m => { if (m.group.visible) m.group.children.forEach(c => { if (c.userData.ifc) targets.push(c); }); });
+  const hits = raycaster.intersectObjects(targets, false);
+  if (hits.length === 0) { selectObject(null); return; }
+  const h = hits[0];
+  if (h.object.userData.ifc) selectIfcElement(h.object, h.faceIndex);
+  else selectObject(h.object.userData.id);
 });
 
 // --- Parametrisk input ---
-const paramDefs = {
-  box:      [{k:'l',l:'lengde (X)',v:2}, {k:'b',l:'bredde (Y)',v:1}, {k:'h',l:'høyde (Z)',v:1}],
-  cylinder: [{k:'r',l:'radius',v:1}, {k:'h',l:'høyde',v:2}, {k:'seg',l:'segmenter',v:32}],
-  cone:     [{k:'r',l:'radius (base)',v:1}, {k:'h',l:'høyde',v:2}, {k:'seg',l:'segmenter',v:32}],
-  sphere:   [{k:'r',l:'radius',v:1}, {k:'seg',l:'segmenter',v:32}],
-  tube:     [{k:'od',l:'ytre diameter',v:2}, {k:'t',l:'tykkelse',v:0.2}, {k:'h',l:'høyde',v:1.5}, {k:'seg',l:'segmenter',v:32}],
-  flatspunt: [{k:'b',l:'bredde',v:0.6}, {k:'t',l:'tykkelse',v:0.012}, {k:'rot',l:'retning (grader, med klokka fra nord)',v:0}, {k:'h',l:'lengde (vertikal)',v:6}],
-};
-
-const typeSel = document.getElementById('type');
-const paramsDiv = document.getElementById('params');
-
-function renderParams() {
-  const defs = paramDefs[typeSel.value];
-  paramsDiv.innerHTML = defs.map(d => {
-    if (d.type === 'text') {
-      return `
-    <div class="field">
-      <label>${d.l}</label>
-      <textarea id="p_${d.k}" rows="2" style="width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text); padding:7px 8px; border-radius:4px; font-family:var(--mono); font-size:11px; resize:vertical;">${d.v}</textarea>
-    </div>`;
-    }
-    return `
-    <div class="field">
-      <label>${d.l}</label>
-      <input type="number" id="p_${d.k}" value="${d.v}" step="0.1">
-    </div>`;
-  }).join('');
-}
-typeSel.addEventListener('change', renderParams);
-renderParams();
-
-// --- Egenskaper (Pset) — utkast før objekt legges til ---
-let draftProps = [];
-
-function renderPropRows() {
-  const c = document.getElementById('propRows');
-  if (draftProps.length === 0) { c.innerHTML = ''; return; }
-  c.innerHTML = draftProps.map((pr, i) => `
-    <div class="prop-row">
-      <input type="text" value="${pr.k.replace(/"/g,'&quot;')}" placeholder="navn" data-i="${i}" data-f="k" class="propInput">
-      <input type="text" value="${pr.v.replace(/"/g,'&quot;')}" placeholder="verdi" data-i="${i}" data-f="v" class="propInput">
-      <span class="del" data-del="${i}">✕</span>
-    </div>`).join('');
-  c.querySelectorAll('.propInput').forEach(inp => {
-    inp.addEventListener('input', e => {
-      draftProps[+e.target.dataset.i][e.target.dataset.f] = e.target.value;
-    });
-  });
-  c.querySelectorAll('[data-del]').forEach(el => {
-    el.addEventListener('click', e => {
-      draftProps.splice(+e.target.dataset.del, 1);
-      renderPropRows();
-    });
-  });
-}
-document.getElementById('addPropRow').addEventListener('click', () => {
-  draftProps.push({ k: '', v: '' });
-  renderPropRows();
-});
 
 // --- Objektstyring ---
 let objects = []; // {id, mesh, type, params}
 let idCounter = 1;
-
-function getParamVals() {
-  const defs = paramDefs[typeSel.value];
-  const vals = {};
-  defs.forEach(d => {
-    const el = document.getElementById('p_' + d.k);
-    vals[d.k] = d.type === 'text' ? el.value : parseFloat(el.value);
-  });
-  return vals;
-}
 
 function buildGeometry(type, p) {
   switch(type) {
@@ -565,52 +616,6 @@ function extrudeFromPolygon(pts, height) {
   geo.rotateX(-Math.PI / 2);
   geo.translate(0, -height, 0); // origo = topp, geometrien strekker seg nedover (som rør/peler)
   return geo;
-}
-
-function addObject() {
-  const type = typeSel.value;
-  const p = getParamVals();
-
-  if (type === 'flatspunt') {
-    if (p.t <= 0 || p.b <= 0 || p.t >= p.b) {
-      alert('Ugyldig flatspunt — tykkelse og bredde må være større enn 0, og tykkelsen mindre enn bredden.');
-      return;
-    }
-    p.profilePoints = computeFlatspuntPoints(p);
-  }
-
-  const geo = buildGeometry(type, p);
-  const color = document.getElementById('color').value || '#4fb0ae';
-  const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), metalness: 0.15, roughness: 0.55 });
-  const mesh = new THREE.Mesh(geo, mat);
-
-  const px = parseFloat(document.getElementById('px').value) || 0;
-  const py = parseFloat(document.getElementById('py').value) || 0;
-  const pz = parseFloat(document.getElementById('pz').value) || 0;
-  mesh.position.set(px, py, pz);
-
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
-  mesh.add(edges);
-
-  scene.add(mesh);
-
-  const id = idCounter++;
-  mesh.userData.id = id;
-  const name = (document.getElementById('objName').value || '').trim();
-  const ifcType = document.getElementById('ifcType').value;
-  const props = draftProps.filter(pr => pr.k.trim() !== '');
-
-  // Ryddig visning i liste/detaljpanel — punktlisten (rå tekst/array) vises ikke som et generisk "dims"-felt
-  let displayParams = p;
-  if (type === 'flatspunt') displayParams = { b: p.b, t: p.t, rot: p.rot || 0, h: p.h };
-
-  objects.push({ id, mesh, type, params: displayParams, name, ifcType, props, color, profilePoints: p.profilePoints });
-  renderList();
-
-  // nullstill utkast til neste objekt
-  document.getElementById('objName').value = '';
-  draftProps = [];
-  renderPropRows();
 }
 
 // --- Import av vertikale rør fra fil (txt/csv/xlsx) ---
@@ -689,14 +694,7 @@ function rowsToPipes(rows) {
   };
 
   const letterFields = {
-    x: document.getElementById('colEast').value,
-    y: document.getElementById('colNorth').value,
-    z: document.getElementById('colZ').value,
-    od: document.getElementById('colOD').value,
-    t: document.getElementById('colT').value,
-    l: document.getElementById('colL').value,
-    berg: document.getElementById('colBerg').value,
-    losmasse: document.getElementById('colLosmasse').value,
+    x: 'G', y: 'F', z: 'E', od: 'C', t: 'D', l: 'H', berg: 'I', losmasse: 'J', // fast kolonneoppsett i rørprotokollen
   };
   const useExplicit = Object.values(letterFields).some(v => v.trim() !== '');
   const mmToM = document.getElementById('mmToM').checked;
@@ -795,7 +793,9 @@ function applyOrigin() {
     if (!o.worldPos) return; // manuelt tilførte objekter har ingen verdenskoordinat å forskyve fra
     const { x, y, z } = o.worldPos;
     o.mesh.position.set(x - worldOrigin.e, z - worldOrigin.h, -(y - worldOrigin.n));
+    syncFlag(o);
   });
+  if (typeof placeIfcModels === 'function') placeIfcModels();
   if (selectedId !== null) selectObject(selectedId); // oppdater markeringsboksen til ny posisjon
 }
 
@@ -826,7 +826,7 @@ const ROCK_COLOR = '#8C8C8C'; // steingrå, for bergsegment
 const STEEL_CORE_COLOR = '#2E6FDE'; // blå, for massiv stålkjerne (t=0)
 const FLATSPUNT_COLOR = '#5B7C99'; // stålblå-grå, for flatspunt
 
-function addPipeSegment({ x, y, z, od, t, h, name, color, props }) {
+function addPipeSegment({ x, y, z, od, t, h, name, color, props, flag }) {
   const geo = buildGeometry('tube', { od, t, h, seg: 32 });
   const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), metalness: 0.15, roughness: 0.55 });
   const mesh = new THREE.Mesh(geo, mat);
@@ -840,12 +840,14 @@ function addPipeSegment({ x, y, z, od, t, h, name, color, props }) {
 
   const id = idCounter++;
   mesh.userData.id = id;
-  objects.push({
+  const newObj = {
     id, mesh, type: 'tube', params: { od: +od.toFixed(4), t: +t.toFixed(4), h: +h.toFixed(4) },
     name, ifcType: 'IFCPIPESEGMENT',
     worldPos: { x, y, z },
     props, color,
-  });
+  };
+  objects.push(newObj);
+  attachFlag(newObj, flag); // Element-ID på toppen (ingen tekst = ingen flagg)
 }
 
 function addPipeFromData(data, i) {
@@ -868,6 +870,7 @@ function addPipeFromData(data, i) {
     addPipeSegment({
       x, y, z, od, t, h: l, name: baseName, color: isCore ? STEEL_CORE_COLOR : PIPE_COLOR,
       props: [{ k: 'Kote topp (Z)', v: String(z) }, ...baseProps],
+      flag: baseName,
     });
     return;
   }
@@ -875,6 +878,7 @@ function addPipeFromData(data, i) {
   if (lm > 0) {
     addPipeSegment({
       x, y, z, od, t, h: lm, name: `${baseName}_løsmasser`, color: isCore ? STEEL_CORE_COLOR : PIPE_COLOR,
+      flag: baseName,
       props: [
         { k: 'Segment', v: 'Løsmasser' }, { k: 'Kote topp (Z)', v: String(z) },
         { k: 'Lengde segment [m]', v: String(lm) }, ...baseProps,
@@ -884,7 +888,9 @@ function addPipeFromData(data, i) {
   if (bg > 0) {
     const zBerg = z - (isNaN(lm) ? 0 : lm);
     addPipeSegment({
-      x, y, z: zBerg, od, t, h: bg, name: `${baseName}_berg`, color: isCore ? STEEL_CORE_COLOR : ROCK_COLOR,
+      x, y, z: zBerg, od, t, h: bg, name: `${baseName}_berg`, color: ROCK_COLOR,
+      // bergsegmentet ligger under løsmassesegmentet — flagget sitter på toppen av røret, ikke midt på det
+      flag: lm > 0 ? null : baseName,
       props: [
         { k: 'Segment', v: 'Berg' }, { k: 'Kote topp berg (Z)', v: String(zBerg) },
         { k: 'Lengde segment [m]', v: String(bg) }, ...baseProps,
@@ -972,13 +978,7 @@ function rowsToSpunt(rows) {
   };
 
   const letterFields = {
-    x: document.getElementById('spColEast').value,
-    y: document.getElementById('spColNorth').value,
-    z: document.getElementById('spColZ').value,
-    b: document.getElementById('spColB').value,
-    t: document.getElementById('spColT').value,
-    rot: document.getElementById('spColRot').value,
-    h: document.getElementById('spColL').value,
+    x: 'G', y: 'F', z: 'E', b: 'C', t: 'D', rot: 'H', h: 'I', // fast kolonneoppsett i spuntprotokollen
   };
   const mmToM = document.getElementById('spMmToM').checked;
 
@@ -1048,7 +1048,7 @@ function addFlatspuntFromData(data, i) {
 
   const id = idCounter++;
   mesh.userData.id = id;
-  objects.push({
+  const newObj = {
     id, mesh, type: 'flatspunt', params: { b: +b.toFixed(4), t: +t.toFixed(4), rot, h: +h.toFixed(4) },
     name: name || `Spunt_${i + 1}`,
     ifcType: 'IFCWALL',
@@ -1060,7 +1060,9 @@ function addFlatspuntFromData(data, i) {
       { k: 'Bredde [m]', v: String(b) }, { k: 'Tykkelse [m]', v: String(t) }, { k: 'Retning [grader]', v: String(rot) },
       ...(extraProps || []),
     ],
-  });
+  };
+  objects.push(newObj);
+  attachFlag(newObj, newObj.name);
 }
 
 document.getElementById('pipeFile').addEventListener('change', async (e) => {
@@ -1115,6 +1117,7 @@ document.getElementById('pipeFile').addEventListener('change', async (e) => {
 function removeObject(id) {
   const idx = objects.findIndex(o => o.id === id);
   if (idx === -1) return;
+  disposeFlag(objects[idx]);
   scene.remove(objects[idx].mesh);
   objects[idx].mesh.geometry.dispose();
   objects[idx].mesh.material.dispose();
@@ -1146,7 +1149,6 @@ function renderList() {
   }).join('');
 }
 
-document.getElementById('addBtn').addEventListener('click', addObject);
 document.getElementById('clearBtn').addEventListener('click', () => {
   [...objects].forEach(o => removeObject(o.id));
 });
@@ -1160,7 +1162,7 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   const blob = new Blob([stlString], { type: 'text/plain' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = 'modell.stl';
+  link.download = exportBaseName() + '.stl';
   link.click();
 });
 
@@ -1181,6 +1183,11 @@ function ifcValueWrap(val) {
   const trimmed = String(val).trim();
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) return `IFCREAL(${parseFloat(trimmed)})`;
   return `IFCLABEL('${escStr(val)}')`;
+}
+
+function exportBaseName() {
+  const raw = (document.getElementById('exportName').value || '').trim() || 'Eksport';
+  return raw.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 100);
 }
 
 function exportIFC() {
@@ -1217,7 +1224,7 @@ function exportIFC() {
   const projectedCrs = E(`IFCPROJECTEDCRS('${escStr(crsName)}',$,'${escStr(crsDatum)}',$,$,$,#${lenUnit})`);
   E(`IFCMAPCONVERSION(#${ctx},#${projectedCrs},${F(mapE)},${F(mapN)},${F(mapH)},${F(Math.cos(rotRad))},${F(Math.sin(rotRad))},1.)`);
 
-  const project = E(`IFCPROJECT('${ifcGuid()}',#${owner},'Parametrisk3DProsjekt',$,$,$,$,(#${ctx}),#${units})`);
+  const project = E(`IFCPROJECT('${ifcGuid()}',#${owner},'${escStr(exportBaseName())}',$,$,$,$,(#${ctx}),#${units})`);
 
   const sitePl = E(`IFCLOCALPLACEMENT($,#${worldAx})`);
   const site = E(`IFCSITE('${ifcGuid()}',#${owner},'Site',$,$,#${sitePl},$,$,.ELEMENT.,$,$,$,$,$)`);
@@ -1242,6 +1249,117 @@ function exportIFC() {
     return styleId;
   }
 
+  const exportFlags = document.getElementById('flagExport').checked;
+  const textH = Math.max(parseFloat(document.getElementById('flagExportH').value) || 0.3, 0.01);
+  const annIds = [];
+  const flagMode = document.getElementById('flagIfcMode').value;
+  const flagOrient = document.getElementById('flagOrient').value;
+  let annCtx = null;
+  function getAnnCtx() {
+    if (annCtx) return annCtx;
+    annCtx = E(`IFCGEOMETRICREPRESENTATIONSUBCONTEXT('Annotation','Plan',*,*,*,*,#${ctx},0.01,.PLAN_VIEW.,$)`);
+    return annCtx;
+  }
+  // Enkel 5x7 blokkfont (kun store bokstaver, tall og noen tegn) — rene rektangler, godt lesbar også i små flagg
+  const FONT = (() => {
+    const d = {
+      '0':'01110 10001 10011 10101 11001 10001 01110','1':'00100 01100 00100 00100 00100 00100 01110',
+      '2':'01110 10001 00001 00010 00100 01000 11111','3':'11110 00001 00001 01110 00001 00001 11110',
+      '4':'00010 00110 01010 10010 11111 00010 00010','5':'11111 10000 11110 00001 00001 10001 01110',
+      '6':'00110 01000 10000 11110 10001 10001 01110','7':'11111 00001 00010 00100 01000 01000 01000',
+      '8':'01110 10001 10001 01110 10001 10001 01110','9':'01110 10001 10001 01111 00001 00010 01100',
+      'A':'01110 10001 10001 11111 10001 10001 10001','B':'11110 10001 10001 11110 10001 10001 11110',
+      'C':'01110 10001 10000 10000 10000 10001 01110','D':'11110 10001 10001 10001 10001 10001 11110',
+      'E':'11111 10000 10000 11110 10000 10000 11111','F':'11111 10000 10000 11110 10000 10000 10000',
+      'G':'01110 10001 10000 10111 10001 10001 01111','H':'10001 10001 10001 11111 10001 10001 10001',
+      'I':'01110 00100 00100 00100 00100 00100 01110','J':'00111 00010 00010 00010 00010 10010 01100',
+      'K':'10001 10010 10100 11000 10100 10010 10001','L':'10000 10000 10000 10000 10000 10000 11111',
+      'M':'10001 11011 10101 10101 10001 10001 10001','N':'10001 11001 10101 10011 10001 10001 10001',
+      'O':'01110 10001 10001 10001 10001 10001 01110','P':'11110 10001 10001 11110 10000 10000 10000',
+      'Q':'01110 10001 10001 10001 10101 10010 01101','R':'11110 10001 10001 11110 10100 10010 10001',
+      'S':'01111 10000 10000 01110 00001 00001 11110','T':'11111 00100 00100 00100 00100 00100 00100',
+      'U':'10001 10001 10001 10001 10001 10001 01110','V':'10001 10001 10001 10001 10001 01010 00100',
+      'W':'10001 10001 10001 10101 10101 11011 10001','X':'10001 10001 01010 00100 01010 10001 10001',
+      'Y':'10001 10001 01010 00100 00100 00100 00100','Z':'11111 00001 00010 00100 01000 10000 11111',
+      '-':'00000 00000 00000 11111 00000 00000 00000','_':'00000 00000 00000 00000 00000 00000 11111',
+      '.':'00000 00000 00000 00000 00000 01100 01100','/':'00001 00001 00010 00100 01000 10000 10000',
+      ' ':'00000 00000 00000 00000 00000 00000 00000','?':'01110 10001 00001 00010 00100 00000 00100',
+    };
+    const o = {};
+    Object.keys(d).forEach(k => o[k] = d[k].split(' '));
+    return o;
+  })();
+  // Teksten som rektangler (kjørelengde per rad). Lokale 2D-koordinater i meter: x mot høyre, y opp, sentrert rundt (0,0)
+  function textRects(text, h) {
+    const t = String(text).toUpperCase().replace(/Æ/g,'AE').replace(/Ø/g,'O').replace(/Å/g,'A');
+    const cell = h / 7, adv = 6; // 5 kolonner + 1 mellomrom
+    const widthCells = t.length * adv - 1;
+    const rects = [];
+    [...t].forEach((ch, ci) => {
+      const g = FONT[ch] || FONT['?'];
+      for (let r = 0; r < 7; r++) {
+        let c = 0;
+        while (c < 5) {
+          if (g[r][c] === '1') {
+            let e = c; while (e < 5 && g[r][e] === '1') e++;
+            const x0 = (ci * adv + c - widthCells / 2) * cell, x1 = (ci * adv + e - widthCells / 2) * cell;
+            const y1 = (3.5 - r) * cell, y0 = y1 - cell;
+            rects.push([x0, y0, x1, y1]); c = e;
+          } else c++;
+        }
+      }
+    });
+    return { rects, w: widthCells * cell, h };
+  }
+  // Flagg-geometri lokalt (origo = toppunkt av elementet, z opp): stolpe + plate + tekst på begge sider
+  // orient 'vert': stående plate (tekst leses fra syd og nord) · 'horiz': liggende plate (tekst leses ovenfra og nedenfra)
+  function buildFlagGeometry(text, h, orient) {
+    const tr = textRects(text, h);
+    const m = h * 0.5, T = Math.max(h * 0.15, 0.005), eps = 0.002;
+    const hw = tr.w / 2 + m, hh = h / 2 + m;
+    const sw = Math.max(h * 0.12, 0.01);
+    const plate = { verts: [], tris: [] }, tx = { verts: [], tris: [] };
+    const box = (g, ax, ay, az, bx, by, bz) => {
+      const b = g.verts.length;
+      g.verts.push([ax,ay,az],[bx,ay,az],[bx,by,az],[ax,by,az],[ax,ay,bz],[bx,ay,bz],[bx,by,bz],[ax,by,bz]);
+      [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]]
+        .forEach(t => g.tris.push([b + t[0], b + t[1], b + t[2]]));
+    };
+    const quad = (pts) => { const b = tx.verts.length; pts.forEach(v => tx.verts.push(v));
+      tx.tris.push([b,b+1,b+2],[b,b+2,b+3],[b,b+2,b+1],[b,b+3,b+2]); };
+    if (orient === 'horiz') {
+      const zp = h * 1.5;
+      box(plate, -sw/2, -sw/2, 0, sw/2, sw/2, zp);
+      box(plate, -hw, -hh, zp, hw, hh, zp + T);
+      tr.rects.forEach(([x0,y0,x1,y1]) => {
+        quad([[x0,y0,zp+T+eps],[x1,y0,zp+T+eps],[x1,y1,zp+T+eps],[x0,y1,zp+T+eps]]);      // oversiden
+        quad([[-x0,y0,zp-eps],[-x1,y0,zp-eps],[-x1,y1,zp-eps],[-x0,y1,zp-eps]]);           // undersiden, speilet
+      });
+    } else {
+      // Stående plate med lengste side vertikal: teksten er rotert 90° og leses nedenfra og opp
+      const zp = h * 0.8;
+      const pw = h / 2 + m, ph = tr.w / 2 + m; // halv bredde (horisontalt) og halv høyde (vertikalt)
+      box(plate, -sw/2, -sw/2, 0, sw/2, sw/2, zp);
+      box(plate, -pw, -T/2, zp, pw, T/2, zp + 2*ph);
+      const zc = zp + ph;
+      tr.rects.forEach(([x0,y0,x1,y1]) => {
+        // rotasjon 90° mot klokka: (x,y) -> (u,v) = (-y, x)
+        const u0 = -y1, u1 = -y0, v0 = x0, v1 = x1;
+        quad([[u0,-T/2-eps,zc+v0],[u1,-T/2-eps,zc+v0],[u1,-T/2-eps,zc+v1],[u0,-T/2-eps,zc+v1]]);   // sørsiden
+        quad([[-u0,T/2+eps,zc+v0],[-u1,T/2+eps,zc+v0],[-u1,T/2+eps,zc+v1],[-u0,T/2+eps,zc+v1]]);   // nordsiden, speilet
+      });
+    }
+    return { plate, text: tx };
+  }
+  let textStyleId = null;
+  function getTextStyle() {
+    if (textStyleId) return textStyleId;
+    const col = E(`IFCCOLOURRGB($,0.,0.,0.)`);
+    const defFont = E(`IFCTEXTSTYLEFORDEFINEDFONT(#${col},$)`);
+    const fontModel = E(`IFCTEXTSTYLEFONTMODEL('Arial',('Arial'),$,$,$,IFCLENGTHMEASURE(${F(textH)}))`);
+    textStyleId = E(`IFCTEXTSTYLE('Element-ID',#${defFont},$,#${fontModel},.F.)`);
+    return textStyleId;
+  }
   objects.forEach(o => {
     const p = o.params;
     const pos = o.mesh.position;
@@ -1337,6 +1455,44 @@ function exportIFC() {
     const proxy = E(`${o.ifcType}('${ifcGuid()}',#${owner},'${elemName}',$,$,#${objPlacement},#${prodShape},$,$)`);
     proxyIds.push(proxy);
 
+    // Element-ID som tekstflagg (IfcAnnotation + IfcTextLiteral) på toppen av elementet
+    if (exportFlags && o.flag && o.flagText && flagMode === 'geom') {
+      // Fysisk infoflagg: stolpe + horisontal plate med ID-tekst på oversiden (leses ovenfra) og undersiden (leses nedenfra)
+      const fg = buildFlagGeometry(o.flagText, textH, flagOrient);
+      const mkSet = (g) => {
+        const cl = E(`IFCCARTESIANPOINTLIST3D((${g.verts.map(v => `(${F(v[0])},${F(v[1])},${F(v[2])})`).join(',')}))`);
+        return E(`IFCTRIANGULATEDFACESET(#${cl},$,$,(${g.tris.map(t => `(${t[0] + 1},${t[1] + 1},${t[2] + 1})`).join(',')}),$)`);
+      };
+      const plateSet = mkSet(fg.plate), textSet = mkSet(fg.text);
+      E(`IFCSTYLEDITEM(#${plateSet},(#${getOrCreateStyle('#F2C230')}),$)`);
+      E(`IFCSTYLEDITEM(#${textSet},(#${getOrCreateStyle('#111111')}),$)`);
+      const fRep = E(`IFCSHAPEREPRESENTATION(#${ctx},'Body','Tessellation',(#${plateSet},#${textSet}))`);
+      const fShape = E(`IFCPRODUCTDEFINITIONSHAPE($,$,(#${fRep}))`);
+      const fOrg = E(`IFCCARTESIANPOINT((${F(ix)},${F(iy)},${F(iz + (o.flagTopY || 0))}))`);
+      const fAx = E(`IFCAXIS2PLACEMENT3D(#${fOrg},$,$)`);
+      const fPl = E(`IFCLOCALPLACEMENT(#${storeyPl},#${fAx})`);
+      const fProxy = E(`IFCBUILDINGELEMENTPROXY('${ifcGuid()}',#${owner},'${escStr(o.flagText)}_flagg',$,'Element-ID',#${fPl},#${fShape},$,$)`);
+      const idProp = E(`IFCPROPERTYSINGLEVALUE('Element-ID',$,IFCLABEL('${escStr(o.flagText)}'),$)`);
+      const fPset = E(`IFCPROPERTYSET('${ifcGuid()}',#${owner},'Pset_Infoflagg',$,(#${idProp}))`);
+      E(`IFCRELDEFINESBYPROPERTIES('${ifcGuid()}',#${owner},$,$,(#${fProxy}),#${fPset})`);
+      annIds.push(fProxy);
+    }
+    if (exportFlags && o.flag && o.flagText && flagMode === 'annot') {
+      const ax0 = E(`IFCCARTESIANPOINT((${F(ix)},${F(iy)},${F(iz + (o.flagTopY || 0) + textH * 0.5)}))`);
+      const nrm = E(`IFCDIRECTION((0.,-1.,0.))`);   // tekstplan vender mot syd (leses fra sør)
+      const rfd = E(`IFCDIRECTION((1.,0.,0.))`);
+      const tAx = E(`IFCAXIS2PLACEMENT3D(#${ax0},#${nrm},#${rfd})`);
+      const lit0 = E(`IFCCARTESIANPOINT((0.,0.,0.))`);
+      const litAx = E(`IFCAXIS2PLACEMENT3D(#${lit0},$,$)`);
+      const lit = E(`IFCTEXTLITERAL('${escStr(o.flagText)}',#${litAx},.RIGHT.)`);
+      E(`IFCSTYLEDITEM(#${lit},(#${getTextStyle()}),$)`);
+      const aRep = E(`IFCSHAPEREPRESENTATION(#${getAnnCtx()},'Annotation','Annotation2D',(#${lit}))`);
+      const aShape = E(`IFCPRODUCTDEFINITIONSHAPE($,$,(#${aRep}))`);
+      const aPl = E(`IFCLOCALPLACEMENT(#${storeyPl},#${tAx})`);
+      const ann = E(`IFCANNOTATION('${ifcGuid()}',#${owner},'${escStr(o.flagText)}',$,'Element-ID',#${aPl},#${aShape})`);
+      annIds.push(ann);
+    }
+
     if (o.props.length > 0) {
       const propValueIds = o.props.map(pr =>
         E(`IFCPROPERTYSINGLEVALUE('${escStr(pr.k)}',$,${ifcValueWrap(pr.v)},$)`)
@@ -1346,12 +1502,12 @@ function exportIFC() {
     }
   });
 
-  E(`IFCRELCONTAINEDINSPATIALSTRUCTURE('${ifcGuid()}',#${owner},$,$,(${proxyIds.map(i => '#' + i).join(',')}),#${storey})`);
+  E(`IFCRELCONTAINEDINSPATIALSTRUCTURE('${ifcGuid()}',#${owner},$,$,(${proxyIds.concat(annIds).map(i => '#' + i).join(',')}),#${storey})`);
 
   const header = `ISO-10303-21;
 HEADER;
 FILE_DESCRIPTION((''),'2;1');
-FILE_NAME('modell.ifc','${new Date().toISOString()}',(''),(''),'Parametrisk 3D Tool','','');
+FILE_NAME('${escStr(exportBaseName())}.ifc','${new Date().toISOString()}',(''),(''),'Parametrisk 3D Tool','','');
 FILE_SCHEMA(('IFC4'));
 ENDSEC;
 DATA;
@@ -1364,7 +1520,7 @@ END-ISO-10303-21;
   const blob = new Blob([content], { type: 'text/plain' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = 'modell.ifc';
+  link.download = exportBaseName() + '.ifc';
   link.click();
 }
 
@@ -1567,6 +1723,30 @@ function exportDXF() {
     });
   });
 
+  // Element-ID som TEXT (plan-tekst, sentrert) på eget lag, plassert på toppen av elementet
+  const exportFlags = document.getElementById('flagExport').checked;
+  const textH = Math.max(parseFloat(document.getElementById('flagExportH').value) || 0.3, 0.01);
+  const FLAG_LAYER = 'ELEMENT-ID';
+  let flagCount = 0;
+  if (exportFlags) {
+    objects.forEach(o => {
+      if (!o.flag || !o.flagText) return;
+      const pos = o.mesh.position;
+      const tx = pos.x + (bakeWorldCoords ? worldOrigin.e : 0);
+      const ty = -pos.z + (bakeWorldCoords ? worldOrigin.n : 0);
+      const tz = pos.y + (o.flagTopY || 0) + (bakeWorldCoords ? worldOrigin.h : 0);
+      const txt = String(o.flagText).replace(/[^\x20-\x7E]/g, c => ({'æ':'ae','ø':'o','å':'a','Æ':'AE','Ø':'O','Å':'A'}[c] || '?'));
+      trackBounds({ x: tx, y: ty, z: tz });
+      entityLines.push(
+        '0', 'TEXT', '8', FLAG_LAYER, '62', '7',
+        '10', F(tx), '20', F(ty), '30', F(tz),
+        '40', F(textH), '1', txt, '72', '1',
+        '11', F(tx), '21', F(ty), '31', F(tz),
+      );
+      flagCount++;
+    });
+  }
+
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
   const viewHeight = Math.max(maxX - minX, maxY - minY, 1) * 1.2; // litt margin rundt modellen
 
@@ -1579,7 +1759,8 @@ function exportDXF() {
   P(0, 'ENDSEC');
 
   P(0, 'SECTION'); P(2, 'TABLES');
-  P(0, 'TABLE'); P(2, 'LAYER'); P(70, layers.length);
+  P(0, 'TABLE'); P(2, 'LAYER'); P(70, layers.length + (flagCount ? 1 : 0));
+  if (flagCount) { P(0, 'LAYER'); P(2, FLAG_LAYER); P(70, 0); P(62, 7); P(6, 'CONTINUOUS'); }
   layers.forEach(({ name, aci }) => {
     P(0, 'LAYER'); P(2, name); P(70, 0); P(62, aci); P(6, 'CONTINUOUS');
   });
@@ -1625,10 +1806,293 @@ function exportDXF() {
   const blob = new Blob([content], { type: 'text/plain' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = 'modell.dxf';
+  link.download = exportBaseName() + '.dxf';
   link.click();
 }
 document.getElementById('exportDxfBtn').addEventListener('click', exportDXF);
+
+// --- IFC-import (kun visning) — modellene ligger utenfor "objects": kan ikke velges, endres eller eksporteres ---
+const IFC_CDN = 'https://cdn.jsdelivr.net/npm/web-ifc@0.0.66/';
+const ifcGroup = new THREE.Group(); scene.add(ifcGroup);
+const ifcModels = []; // { group, anchor: {x,y,z} i verdenskoordinater (x=Ø, y=kote, z=-N) }
+let ifcApiPromise = null;
+
+function getIfcApi() {
+  if (!ifcApiPromise) {
+    ifcApiPromise = (async () => {
+      if (typeof WebIFC === 'undefined') throw new Error('Kunne ikke laste web-ifc (sjekk nettforbindelse / adblocker).');
+      const api = new WebIFC.IfcAPI();
+      api.SetWasmPath(IFC_CDN, true); // absolutt URL — ellers prefikses den med skriptets egen plassering
+      await api.Init();
+      return api;
+    })();
+    ifcApiPromise.catch(() => { ifcApiPromise = null; });
+  }
+  return ifcApiPromise;
+}
+
+function placeIfcModels() {
+  ifcModels.forEach(m => m.group.position.set(m.anchor.x - worldOrigin.e, m.anchor.y - worldOrigin.h, m.anchor.z + worldOrigin.n));
+}
+
+async function loadIfcFile(file) {
+  const statusEl = document.getElementById('ifcStatus');
+  statusEl.style.color = 'var(--accent)';
+  statusEl.textContent = 'leser IFC …';
+  try {
+    const api = await getIfcApi();
+    const data = new Uint8Array(await file.arrayBuffer());
+    const modelID = api.OpenModel(data, { COORDINATE_TO_ORIGIN: false });
+
+    // Georeferanse: lokale filkoordinater -> verdenskoordinater (IfcMapConversion), hvis filen har det
+    let mE = 0, mN = 0, mH = 0, ca = 1, cb = 0, hasMap = false;
+    try {
+      const ids = api.GetLineIDsWithType(modelID, WebIFC.IFCMAPCONVERSION);
+      if (ids.size() > 0) {
+        const mc = api.GetLine(modelID, ids.get(0));
+        mE = +mc.Eastings.value || 0; mN = +mc.Northings.value || 0; mH = +mc.OrthogonalHeight.value || 0;
+        ca = mc.XAxisAbscissa ? +mc.XAxisAbscissa.value : 1; cb = mc.XAxisOrdinate ? +mc.XAxisOrdinate.value : 0;
+        if (!isFinite(ca) || !isFinite(cb) || (ca === 0 && cb === 0)) { ca = 1; cb = 0; }
+        hasMap = true;
+      }
+    } catch (e) { /* ingen georeferanse — bruk filkoordinater som de er */ }
+
+    // web-ifc leverer allerede Y-opp (x=Ø, y=kote, z=-N). Regn i dobbel presisjon og lagre relativt til et ankerpunkt.
+    const buckets = new Map(); // fargenøkkel -> { color, alpha, pos[], nor[], idx[] }
+    let mnX = Infinity, mnY = Infinity, mnZ = Infinity, mxX = -Infinity, mxY = -Infinity, mxZ = -Infinity;
+    let nPlaced = 0;
+    api.StreamAllMeshes(modelID, (mesh) => {
+      const pg = mesh.geometries;
+      for (let i = 0; i < pg.size(); i++) {
+        const g = pg.get(i);
+        const geo = api.GetGeometry(modelID, g.geometryExpressID);
+        const verts = api.GetVertexArray(geo.GetVertexData(), geo.GetVertexDataSize());
+        const index = api.GetIndexArray(geo.GetIndexData(), geo.GetIndexDataSize());
+        const m = g.flatTransformation, c = g.color;
+        const key = [c.x, c.y, c.z, c.w].map(v => v.toFixed(3)).join(',');
+        let b = buckets.get(key);
+        if (!b) { b = { color: [c.x, c.y, c.z], alpha: c.w, pos: [], nor: [], idx: [], count: 0, ranges: [] }; buckets.set(key, b); }
+        const base = b.count;
+        const triStart = b.idx.length / 3;
+        for (let k = 0; k < verts.length; k += 6) {
+          const x = verts[k], y = verts[k + 1], z = verts[k + 2];
+          let X = m[0] * x + m[4] * y + m[8] * z + m[12];
+          let Y = m[1] * x + m[5] * y + m[9] * z + m[13];
+          let Z = m[2] * x + m[6] * y + m[10] * z + m[14];
+          const nx = verts[k + 3], ny = verts[k + 4], nz = verts[k + 5];
+          let NX = m[0] * nx + m[4] * ny + m[8] * nz, NY = m[1] * nx + m[5] * ny + m[9] * nz, NZ = m[2] * nx + m[6] * ny + m[10] * nz;
+          if (hasMap) {
+            const Xr = ca * X + cb * Z + mE, Zr = -cb * X + ca * Z - mN; // rotasjon om vertikalaksen + forskyvning
+            X = Xr; Z = Zr; Y += mH;
+            const nXr = ca * NX + cb * NZ, nZr = -cb * NX + ca * NZ; NX = nXr; NZ = nZr;
+          }
+          b.pos.push(X, Y, Z); b.nor.push(NX, NY, NZ);
+          if (X < mnX) mnX = X; if (X > mxX) mxX = X;
+          if (Y < mnY) mnY = Y; if (Y > mxY) mxY = Y;
+          if (Z < mnZ) mnZ = Z; if (Z > mxZ) mxZ = Z;
+        }
+        for (let k = 0; k < index.length; k++) b.idx.push(index[k] + base);
+        b.count += verts.length / 6;
+        b.ranges.push({ s: triStart, e: b.idx.length / 3, id: mesh.expressID });
+        nPlaced++;
+        geo.delete();
+      }
+    });
+    if (nPlaced === 0 || !isFinite(mnX)) {
+      api.CloseModel(modelID);
+      statusEl.style.color = '#d9645f';
+      statusEl.textContent = 'Fant ingen geometri i IFC-fila.';
+      return;
+    }
+
+    const anchor = { x: (mnX + mxX) / 2, y: (mnY + mxY) / 2, z: (mnZ + mxZ) / 2 };
+    const group = new THREE.Group();
+    const model = { group, anchor, name: file.name, api, modelID, elems: new Map() };
+    let triCount = 0;
+    buckets.forEach(b => {
+      const pos = new Float32Array(b.pos.length), nor = new Float32Array(b.nor.length);
+      for (let i = 0; i < b.pos.length; i += 3) {
+        pos[i] = b.pos[i] - anchor.x; pos[i + 1] = b.pos[i + 1] - anchor.y; pos[i + 2] = b.pos[i + 2] - anchor.z;
+        nor[i] = b.nor[i]; nor[i + 1] = b.nor[i + 1]; nor[i + 2] = b.nor[i + 2];
+      }
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geom.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      geom.setIndex(b.count > 65535 ? new THREE.BufferAttribute(Uint32Array.from(b.idx), 1) : new THREE.BufferAttribute(Uint16Array.from(b.idx), 1));
+      const mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(b.color[0], b.color[1], b.color[2]), side: THREE.DoubleSide,
+        metalness: 0.1, roughness: 0.75, transparent: b.alpha < 1, opacity: b.alpha, depthWrite: b.alpha >= 1,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.userData.ifc = { model, ranges: b.ranges }; // aldri en del av objects — kan velges for visning av egenskaper, men ikke endres/eksporteres
+      b.ranges.forEach(r => { if (!model.elems.has(r.id)) model.elems.set(r.id, []); model.elems.get(r.id).push({ mesh, s: r.s, e: r.e }); });
+      group.add(mesh);
+      triCount += b.idx.length / 3;
+    });
+    ifcGroup.add(group);
+    model.size = { x: mxX - mnX, y: mxY - mnY, z: mxZ - mnZ };
+    ifcModels.push(model);
+    group.visible = document.getElementById('ifcVisible').checked;
+
+    // Ingen origo satt ennå og ingen objekter fra Excel: flytt origo til modellens senter, så koordinatene blir små
+    if (objects.length === 0 && ifcModels.length === 1 && worldOrigin.e === 0 && worldOrigin.n === 0 && worldOrigin.h === 0) {
+      worldOrigin = { e: anchor.x, n: -anchor.z, h: anchor.y };
+      document.getElementById('crsE').value = worldOrigin.e.toFixed(3);
+      document.getElementById('crsN').value = worldOrigin.n.toFixed(3);
+      document.getElementById('crsH').value = worldOrigin.h.toFixed(3);
+      applyOrigin();
+    }
+    placeIfcModels();
+    fitViewToAll();
+    statusEl.textContent = `${file.name}: ${model.elems.size} elementer · ${Math.round(triCount)} trekanter${hasMap ? ' · georeferert' : ''}`;
+  } catch (err) {
+    console.error(err);
+    statusEl.style.color = '#d9645f';
+    statusEl.textContent = 'Kunne ikke lese IFC: ' + (err && err.message ? err.message : err);
+  }
+}
+
+function fitViewToAll() {
+  const box = new THREE.Box3();
+  objects.forEach(o => box.expandByObject(o.mesh));
+  ifcGroup.updateMatrixWorld(true);
+  ifcModels.forEach(m => { if (m.group.visible) box.expandByObject(m.group); });
+  if (box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, 1);
+  camera.far = Math.max(1000, maxDim * 20); camera.near = Math.max(0.05, maxDim / 5000); camera.updateProjectionMatrix();
+  controls.target.copy(center);
+  camera.position.set(center.x + maxDim, center.y + maxDim * 0.8, center.z + maxDim);
+  controls.update();
+}
+
+
+// --- Valg av IFC-element (kun visning av egenskaper) ---
+let ifcSel = null; // { model, id, highlight }
+
+function clearIfcSelection() {
+  if (!ifcSel) return;
+  if (ifcSel.highlight) {
+    ifcSel.highlight.parent && ifcSel.highlight.parent.remove(ifcSel.highlight);
+    ifcSel.highlight.geometry.dispose(); ifcSel.highlight.material.dispose();
+  }
+  ifcSel = null;
+}
+
+function selectIfcElement(mesh, faceIndex) {
+  const info = mesh.userData.ifc;
+  // finn elementet som eier trekanten (rangene er sortert på starttrekant)
+  let lo = 0, hi = info.ranges.length - 1, found = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1, r = info.ranges[mid];
+    if (faceIndex < r.s) hi = mid - 1; else if (faceIndex >= r.e) lo = mid + 1; else { found = r; break; }
+  }
+  if (!found) return;
+  selectObject(null); // fjerner evt. valgt Excel-objekt og markering
+  const model = info.model, id = found.id;
+
+  // markering: alle trekanter som hører til elementet, tegnet i gul oppå modellen
+  const pos = [];
+  (model.elems.get(id) || []).forEach(({ mesh: mm, s, e }) => {
+    const g = mm.geometry, idx = g.index.array, pa = g.attributes.position.array;
+    for (let t = s * 3; t < e * 3; t++) { const v = idx[t] * 3; pos.push(pa[v], pa[v + 1], pa[v + 2]); }
+  });
+  const hg = new THREE.BufferGeometry();
+  hg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  const hm = new THREE.Mesh(hg, new THREE.MeshBasicMaterial({
+    color: 0xe8a33d, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthTest: false,
+  }));
+  hm.renderOrder = 5;
+  model.group.add(hm);
+  ifcSel = { model, id, highlight: hm };
+  renderDetails();
+  renderList();
+}
+
+function ifcVal(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'object') return 'value' in v ? ifcVal(v.value) : '';
+  if (v === true) return 'Ja'; if (v === false) return 'Nei';
+  return String(v);
+}
+
+async function readIfcProps(model, id) {
+  const api = model.api, mid = model.modelID;
+  const out = { name: '', type: '', attrs: [], psets: [] };
+  try {
+    const line = api.GetLine(mid, id, false);
+    out.type = api.GetNameFromTypeCode(api.GetLineType(mid, id)) || '';
+    out.name = ifcVal(line.Name) || '';
+    [['GlobalId', 'GlobalId'], ['ObjectType', 'ObjectType'], ['Beskrivelse', 'Description'], ['Tag', 'Tag'], ['PredefinedType', 'PredefinedType']].forEach(([label, key]) => {
+      const v = ifcVal(line[key]); if (v !== '') out.attrs.push([label, v]);
+    });
+  } catch (e) { /* ugyldig linje */ }
+  try {
+    const sets = (await api.properties.getPropertySets(mid, id, true)) || [];
+    sets.forEach(ps => {
+      const rows = [];
+      (ps.HasProperties || []).forEach(pr => {
+        const k = ifcVal(pr.Name); if (!k) return;
+        let v = ifcVal(pr.NominalValue);
+        if (v === '' && pr.EnumerationValues) v = (pr.EnumerationValues || []).map(ifcVal).join(', ');
+        rows.push([k, v]);
+      });
+      (ps.Quantities || []).forEach(q => {
+        const k = ifcVal(q.Name); if (!k) return;
+        const v = ['LengthValue', 'AreaValue', 'VolumeValue', 'CountValue', 'WeightValue', 'TimeValue'].map(f => ifcVal(q[f])).find(x => x !== '') || '';
+        rows.push([k, v]);
+      });
+      out.psets.push({ name: ifcVal(ps.Name) || 'Egenskapssett', rows });
+    });
+  } catch (e) { /* ingen egenskapssett */ }
+  return out;
+}
+
+async function renderIfcDetails() {
+  const el = document.getElementById('details');
+  if (!ifcSel) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const token = ifcSel;
+  const d = await readIfcProps(ifcSel.model, ifcSel.id);
+  if (ifcSel !== token) return; // valget er endret mens egenskapene ble lest
+  el.style.display = 'block';
+  const sec = el.closest('details'); if (sec) sec.open = true; // vis egenskapene selv om seksjonen var lukket
+  const row = ([k, v]) => `<div class="meta-row"><span>${escHtml(k)}</span><span>${escHtml(v)}</span></div>`;
+  const psets = d.psets.length
+    ? d.psets.map(ps => `
+        <div style="font-family:var(--mono); font-size:10.5px; color:var(--accent); margin:8px 0 4px;">${escHtml(ps.name)}</div>
+        ${ps.rows.length ? ps.rows.map(row).join('') : '<div style="color:var(--text-dim); font-size:11px;">tomt</div>'}`).join('')
+    : '<div style="color:var(--text-dim); font-size:11px;">ingen egenskapssett</div>';
+  el.innerHTML = `
+    <div class="details-head">
+      <div class="details-title">${escHtml(d.name || ('#' + ifcSel.id))}</div>
+      <span class="del" onclick="selectObject(null)" title="fjern valg" style="cursor:pointer; color:var(--text-dim);">✕</span>
+    </div>
+    <div class="meta-row"><span>kilde</span><span>IFC-import (kun visning)</span></div>
+    <div class="meta-row"><span>ifc-type</span><span>${escHtml(d.type)}</span></div>
+    <div class="meta-row"><span>fil</span><span>${escHtml(ifcSel.model.name)}</span></div>
+    ${d.attrs.map(row).join('')}
+    <hr style="border-color: var(--line); margin:8px 0;">
+    <div style="font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-bottom:2px;">IFC-EGENSKAPER</div>
+    ${psets}
+  `;
+}
+
+document.getElementById('ifcFile').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  for (const f of files) await loadIfcFile(f);
+  e.target.value = '';
+});
+document.getElementById('ifcVisible').addEventListener('change', (e) => { ifcGroup.visible = e.target.checked; });
+document.getElementById('ifcClearBtn').addEventListener('click', () => {
+  clearIfcSelection(); renderDetails();
+  ifcModels.splice(0).forEach(m => {
+    try { m.api.CloseModel(m.modelID); } catch (e) {}
+    ifcGroup.remove(m.group);
+    m.group.traverse(n => { if (n.geometry) n.geometry.dispose(); if (n.material) n.material.dispose(); });
+  });
+  document.getElementById('ifcStatus').textContent = '';
+});
 renderList(); // vis tom liste ved oppstart (ingen forhåndsmodellert objekt)
 </script>
 </body>
