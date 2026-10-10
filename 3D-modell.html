@@ -824,6 +824,7 @@ document.getElementById('recenterBtn').addEventListener('click', () => {
 
 const ROCK_COLOR = '#8C8C8C'; // steingrå, for bergsegment
 const STEEL_CORE_COLOR = '#2E6FDE'; // blå, for massiv stålkjerne (t=0)
+const STEEL_CORE_BERG_COLOR = '#8E3FC4'; // lilla, for massiv stålkjerne i berg
 const FLATSPUNT_COLOR = '#5B7C99'; // stålblå-grå, for flatspunt
 
 function addPipeSegment({ x, y, z, od, t, h, name, color, props, flag }) {
@@ -888,7 +889,7 @@ function addPipeFromData(data, i) {
   if (bg > 0) {
     const zBerg = z - (isNaN(lm) ? 0 : lm);
     addPipeSegment({
-      x, y, z: zBerg, od, t, h: bg, name: `${baseName}_berg`, color: ROCK_COLOR,
+      x, y, z: zBerg, od, t, h: bg, name: `${baseName}_berg`, color: isCore ? STEEL_CORE_BERG_COLOR : ROCK_COLOR,
       // bergsegmentet ligger under løsmassesegmentet — flagget sitter på toppen av røret, ikke midt på det
       flag: lm > 0 ? null : baseName,
       props: [
