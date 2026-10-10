@@ -7,3 +7,4 @@
 - [Ødometertolkning Janbu](./odometer_viewer.html)
 - [Treakstolkning](./triax_plotter.html)
 - [Justering av spyletrykk TOT](./spyletrykk_justering.html)
+- [Horisontaltrykk fra fundamentlast – elastisitetsteori](./Horisontaltrykk fra fundamentlast – elastisitetsteori.html)
