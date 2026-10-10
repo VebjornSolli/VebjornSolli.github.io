@@ -522,11 +522,20 @@ function drawChart() {
     let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
     if (hi - lo < 1e-12) hi = lo + 1;
     const st = niceStep(hi - lo, 6);
-    lo = Math.floor(lo / st) * st; hi = Math.ceil(hi / st) * st;
+    const mant = Math.round(st / Math.pow(10, Math.floor(Math.log10(st))));
+    const mi = st / (mant === 5 ? 5 : 2);
+    lo = Math.floor(lo / st + 1e-9) * st; hi = Math.ceil(hi / st - 1e-9) * st;
     X = v => m.l + (v - lo) / (hi - lo) * pw;
-    for (let v = lo; v <= hi + st*1e-6; v += st) {
-      el("line", {x1: X(v), x2: X(v), y1: m.t, y2: m.t + ph, stroke: "var(--line)", "stroke-width": Math.abs(v) < st*1e-6 ? 1.5 : 1}, svg);
-      el("text", {x: X(v), y: m.t - 10, "text-anchor": "middle"}, ga, Math.abs(v) < st*1e-6 ? "0" : nf(v, st >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(st)))));
+    const nMi = Math.round((hi - lo) / mi);
+    const labelMinor = nMi <= 12;
+    const lst = labelMinor ? mi : st;
+    const dec = lst >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(lst) - 1e-9));
+    for (let k = 0; k <= nMi; k++) {
+      const v = lo + k * mi;
+      const isZero = Math.abs(v) < mi * 1e-6;
+      const isMajor = Math.abs(v / st - Math.round(v / st)) < 1e-6;
+      el("line", {x1: X(v), x2: X(v), y1: m.t, y2: m.t + ph, stroke: "var(--line)", "stroke-width": isZero ? 1.5 : isMajor ? 1 : 0.75, "stroke-opacity": isMajor || isZero ? 1 : 0.6}, svg);
+      if (isMajor || labelMinor) el("text", {x: X(v), y: m.t - 10, "text-anchor": "middle"}, ga, isZero ? "0" : nf(v, dec));
     }
   } else {
     const pos = vals.filter(v => v > 0);
@@ -535,6 +544,8 @@ function drawChart() {
     let dhi = Math.ceil(Math.log10(hi)), dlo = Math.floor(Math.log10(lo));
     dlo = Math.max(dlo, dhi - 8); if (dhi === dlo) dhi++;
     X = v => v > 0 ? m.l + (Math.log10(v) - dlo) / (dhi - dlo) * pw : NaN;
+    for (let e = dlo; e < dhi; e++) for (let k = 2; k <= 9; k++)
+      el("line", {x1: X(k * 10**e), x2: X(k * 10**e), y1: m.t, y2: m.t + ph, stroke: "var(--line)", "stroke-width": 0.75, "stroke-opacity": 0.6}, svg);
     for (let e = dlo; e <= dhi; e++) {
       el("line", {x1: X(10**e), x2: X(10**e), y1: m.t, y2: m.t + ph, stroke: "var(--line)"}, svg);
       el("text", {x: X(10**e), y: m.t - 10, "text-anchor": "middle"}, ga, e >= 0 && e <= 4 ? nf(10**e, 0) : "10" + String(e).replace("-", "−").replace(/\d/g, d => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]).replace("−", "⁻"));
