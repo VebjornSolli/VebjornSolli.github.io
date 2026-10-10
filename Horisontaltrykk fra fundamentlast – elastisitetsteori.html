@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Horisontaltrykk fra fundamentlast – elastisitetsteori</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9ECEB; --panel:#F7F8F7; --ink:#1C2630; --muted:#5B6873; --line:#C9D0D2;
+  --steel:#2A5B87; --ochre:#A5661A; --moss:#5F7C55; --soil:#D9CDB4; --soil-ink:#8B7A58;
+  --wall:#3B4650; --load:rgba(165,102,26,.18); --field:#FFFFFF; --focus:#2A5B87;
+  --warn:#9B3B23;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#151A1E; --panel:#1E252A; --ink:#E3E8EA; --muted:#97A3AB; --line:#36414A;
+    --steel:#7FB0DB; --ochre:#E0A456; --moss:#9CBB8E; --soil:#3A352B; --soil-ink:#A8987A;
+    --wall:#B7C2CA; --load:rgba(224,164,86,.2); --field:#11161A; --focus:#7FB0DB; --warn:#E58A6E;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151A1E; --panel:#1E252A; --ink:#E3E8EA; --muted:#97A3AB; --line:#36414A;
+  --steel:#7FB0DB; --ochre:#E0A456; --moss:#9CBB8E; --soil:#3A352B; --soil-ink:#A8987A;
+  --wall:#B7C2CA; --load:rgba(224,164,86,.2); --field:#11161A; --focus:#7FB0DB; --warn:#E58A6E;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 20px 48px}
+header{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:end;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:22px}
+h1{font:600 clamp(22px,3vw,30px)/1.15 "Archivo Narrow","Archivo",sans-serif;margin:0;letter-spacing:-.01em}
+header p{margin:4px 0 0;color:var(--muted);max-width:62ch}
+.title-in{flex:1 1 280px;max-width:420px}
+.title-in label{display:block;font-size:13px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:22px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.grid > *{min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:18px}
+.panel + .panel{margin-top:18px}
+h2{font:600 17px/1.3 "Archivo Narrow","Archivo",sans-serif;margin:0 0 12px}
+fieldset{border:0;padding:0;margin:0 0 16px}
+legend{font-weight:600;font-size:14px;padding:0;margin-bottom:8px}
+.fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 12px}
+.f label{display:block;font-size:13px;color:var(--muted)}
+.f label i{font-style:italic;color:var(--ink);font-family:Georgia,"Times New Roman",serif;font-size:15px}
+.f input,.title-in input,select{width:100%;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:3px;padding:7px 9px;margin-top:3px}
+.f input{text-align:right}
+.f input.bad{border-color:var(--warn);outline:1px solid var(--warn)}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.hint{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin-top:4px}
+.check input{margin-top:4px;accent-color:var(--steel)}
+.err{color:var(--warn);font-size:13px;min-height:1em;margin:0}
+#plan{width:100%;height:auto;display:block}
+.chart-head{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;margin-bottom:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13.5px}
+.legend > span{display:inline-flex;align-items:center;gap:6px}
+.legend svg{flex:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--muted);padding:5px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+#chart{width:100%;height:auto;display:block;touch-action:none}
+.resultants{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-top:14px}
+.resultants div{background:var(--panel);padding:10px 12px}
+.resultants sub{line-height:0}
+.resultants small{display:block;color:var(--muted);font-size:12.5px;white-space:nowrap;line-height:1.4}
+.resultants b{display:block;font-size:22px;font-weight:600;line-height:1.25;white-space:nowrap}
+.resultants b span{font-size:13px;font-weight:400;color:var(--muted);margin-left:4px}
+.resultants .sym{font-family:Georgia,serif;font-style:italic}
+.tbl-wrap{overflow-x:auto;margin-top:6px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+th,td{padding:5px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;font-size:13px;color:var(--muted);vertical-align:bottom}
+th:first-child,td:first-child{text-align:left}
+tr.hl td{background:color-mix(in srgb,var(--steel) 12%,transparent)}
+.row-btns{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--field);color:var(--ink);border-radius:3px;padding:6px 12px;cursor:pointer}
+details{margin-top:18px}
+summary{cursor:pointer;font-weight:600}
+.theory{font-size:14px;color:var(--ink);max-width:78ch}
+.theory p{margin:8px 0}
+.eq{font-family:Georgia,"Times New Roman",serif;background:var(--field);border:1px solid var(--line);border-radius:3px;padding:8px 12px;overflow-x:auto;white-space:nowrap;margin:6px 0}
+.sx{color:var(--steel)} .sz{color:var(--ochre)} .sk{color:var(--moss)}
+
+input::placeholder{color:var(--muted);opacity:.65}
+.btn.primary{background:var(--steel);border-color:var(--steel);color:var(--panel);font-weight:600}
+.btn:disabled{opacity:.6;cursor:progress}
+.doc-wrap{overflow-x:auto;margin-top:14px;background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:16px}
+.paper{word-spacing:.04em;width:720px;margin:0 auto;background:#fff;color:#1C2630;padding:40px 40px 32px;box-shadow:0 1px 3px rgba(28,38,48,.18);font:13.5px/1.55 "Archivo",Helvetica,Arial,sans-serif}
+.paper .rb{padding:0 0 12px;background:#fff}
+.paper h1{font:600 24px/1.2 "Archivo Narrow","Archivo",sans-serif;margin:4px 0 4px;color:#1C2630}
+.paper h2{font:600 17px/1.3 "Archivo Narrow","Archivo",sans-serif;margin:10px 0 8px;padding-bottom:4px;border-bottom:1.5px solid #1C2630;color:#1C2630}
+.paper h3{font:600 14.5px/1.3 "Archivo",sans-serif;margin:6px 0 4px;color:#1C2630}
+.paper p{margin:5px 0;max-width:none}
+.paper i,.paper em{font-family:"Times New Roman",Times,Georgia,serif;font-size:1.1em;line-height:1;padding:0 .06em 0 .02em}
+.paper sub,.paper sup{line-height:0}
+.paper .small{font-size:12px;color:#5B6873}
+.paper ul{margin:4px 0;padding-left:20px} .paper li{margin:3px 0}
+.paper .refs li{font-size:12.5px}
+.rep-head{border-bottom:2px solid #1C2630;margin-bottom:6px}
+.rep-kicker{font-size:12.5px;color:#2A5B87;font-weight:600}
+.rep-sub{color:#5B6873}
+.rep-meta{font-size:12.5px;color:#5B6873}
+.paper table{min-width:0;font-size:12.5px;width:100%}
+.paper th,.paper td{padding:3px 7px;border-bottom:1px solid #D5DADC;color:#1C2630}
+.paper th{color:#5B6873}
+.paper td.l,.paper th.l{text-align:left;white-space:normal}
+.rep-geo{display:flex;gap:18px;align-items:flex-start;margin-top:6px}
+.rep-geo > div:first-child{flex:0 0 300px} .rep-geo > div:last-child{flex:1}
+.rep-geo svg,#rep-chart svg{width:100%;height:auto;display:block}
+.paper .math{margin:6px 0;text-align:center;font-family:Georgia,serif;color:#1C2630;overflow-x:auto}
+.paper .math mjx-container{margin:0!important}
+.rep-res{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #D5DADC;margin:4px 0 6px}
+.rep-res div{padding:7px 9px;border-right:1px solid #D5DADC} .rep-res div:last-child{border-right:0}
+.rep-res small{display:block;color:#5B6873;font-size:11.5px;white-space:nowrap;height:20px;line-height:20px}
+.rep-res b{display:block;font-size:17px;white-space:nowrap;height:24px;line-height:24px}
+.rep-res i{font-size:1.05em}
+.rep-leg{display:flex;gap:16px;font-size:12px;margin:2px 0 4px;justify-content:center}
+.rep-leg > span{display:inline-flex;align-items:center;gap:5px}
+.rep-leg .sw{display:inline-block;width:22px;height:0;border-top:2.5px solid}
+@media print{
+  body{background:#fff} .panel{border-color:#999} .seg,.btn,details{display:none}
+  .grid{grid-template-columns:300px 1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<script>window.MathJax={tex:{},svg:{fontCache:"none"},options:{enableMenu:false},startup:{typeset:false}};</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Horisontaltrykk mot vegg fra fundamentlast</h1>
+    <p>Spenninger langs en loddrett linje gjennom punkt P, fra en rektangulær flate med jevnt fordelt vertikal- og horisontallast. Elastisitetsteori, Poissons tall ν = 0,5. Basert på regnearket VEGG.XLS av Corneliu Athanasiu.</p>
+  </div>
+  <div class="title-in">
+    <label for="tittel">Tittel</label>
+    <input id="tittel" type="text" value="" placeholder="Prosjekt og/eller beregning">
+  </div>
+</header>
+
+<div class="grid">
+  <div>
+    <section class="panel" aria-labelledby="h-inn">
+      <h2 id="h-inn">Inndata</h2>
+      <fieldset>
+        <legend>Lastflate</legend>
+        <div class="fields">
+          <div class="f"><label for="B">Bredde langs vegg <i>B</i></label><input id="B" inputmode="decimal" value="1" aria-describedby="u-m"></div>
+          <div class="f"><label for="L">Lengde ut fra vegg <i>L</i></label><input id="L" inputmode="decimal" value="2"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Plassering i forhold til P</legend>
+        <div class="fields">
+          <div class="f"><label for="d">Avstand til lastkant <i>d</i></label><input id="d" inputmode="decimal" value="1"></div>
+          <div class="f"><label for="Y">Sideforskyvning <i>Y</i></label><input id="Y" inputmode="decimal" value="1"></div>
+        </div>
+        <p class="hint" id="u-m">Alle mål i meter. <i>Y</i> er avstanden langs veggen fra P til midten av lastflaten.</p>
+      </fieldset>
+      <fieldset>
+        <legend>Last</legend>
+        <div class="fields">
+          <div class="f"><label for="qv">Vertikal <i>q</i><sub>v</sub> (kPa)</label><input id="qv" inputmode="decimal" value="100"></div>
+          <div class="f"><label for="qh">Horisontal <i>q</i><sub>h</sub> (kPa)</label><input id="qh" inputmode="decimal" value="0"></div>
+        </div>
+        <p class="hint">Felt kan inneholde regneuttrykk, f.eks. 300/4/0.2/0.6. Positiv <i>q</i><sub>h</sub> virker mot veggen. <span id="totals"></span></p>
+      </fieldset>
+      <fieldset>
+        <legend>Jord og beregning</legend>
+        <div class="fields">
+          <div class="f"><label for="gamma">Tyngdetetthet <i>γ</i> (kN/m³)</label><input id="gamma" inputmode="decimal" value="0"></div>
+          <div class="f"><label for="ko">Hviletrykk <i>K</i><sub>0</sub></label><input id="ko" inputmode="decimal" value="0.63"></div>
+          <div class="f"><label for="Df">Dybde <i>D</i><sub>f</sub> (m)</label><input id="Df" inputmode="decimal" value="5"></div>
+          <div class="f"><label for="n">Antall intervaller</label><input id="n" inputmode="numeric" value="10"></div>
+        </div>
+        <p class="hint">Regnearket bruker 10 intervaller. Flere intervaller gir mer nøyaktig integrasjon av resultantene, særlig når lasten står helt inntil veggen.</p>
+        <label class="check"><input type="checkbox" id="rigid"> <span>Perfekt stiv vegg: multipliser lastbidraget til <i>σ</i><sub>x</sub> med 2</span></label>
+      </fieldset>
+      <p class="err" id="err" role="alert"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="h-plan">
+      <h2 id="h-plan">Plan</h2>
+      <svg id="plan" viewBox="0 0 360 300" role="img" aria-label="Planskisse av lastflate, vegg og punkt P"></svg>
+    </section>
+  </div>
+
+  <div>
+    <section class="panel" aria-labelledby="h-chart">
+      <div class="chart-head">
+        <h2 id="h-chart" style="margin:0">Spenningsfordeling med dybden</h2>
+        <div class="seg" role="group" aria-label="Skala på spenningsaksen">
+          <button type="button" data-scale="lin" aria-pressed="true">Lineær</button>
+          <button type="button" data-scale="log" aria-pressed="false">Logaritmisk</button>
+        </div>
+      </div>
+      <div class="legend" aria-hidden="true">
+        <span><svg width="26" height="10"><line x1="0" y1="5" x2="26" y2="5" stroke="var(--steel)" stroke-width="2.5"/></svg><span class="sx">σ<sub>x,tot</sub> elastisk horisontalspenning</span></span>
+        <span><svg width="26" height="10"><line x1="0" y1="5" x2="26" y2="5" stroke="var(--ochre)" stroke-width="2"/></svg><span class="sz">σ<sub>z,tot</sub> vertikalspenning</span></span>
+        <span><svg width="26" height="10"><line x1="0" y1="5" x2="26" y2="5" stroke="var(--moss)" stroke-width="2" stroke-dasharray="5 3"/></svg><span class="sk">σ<sub>z,tot</sub> · K<sub>0</sub></span></span>
+      </div>
+      <svg id="chart" viewBox="0 0 720 540" role="img" aria-label="Diagram over spenninger mot dybde"></svg>
+      <div class="resultants" id="res"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-tab">
+      <div class="row-btns">
+        <h2 id="h-tab" style="margin:0">Verdier i beregningspunktene</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="copy" type="button">Kopier tabell</button>
+          <button class="btn" id="txtBtn" type="button">Eksporter z og σ<sub>x,tot</sub> (.txt)</button>
+        </div>
+      </div>
+      <p class="hint" id="txtMsg" role="status">Txt-filen har to tabulatorseparerte kolonner med desimalkomma, klar til å limes inn i Excel.</p>
+      <div class="tbl-wrap"><table id="tbl"></table></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-doc">
+      <div class="row-btns">
+        <h2 id="h-doc" style="margin:0">Dokumentasjon</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="toggleDoc" type="button" aria-expanded="false" aria-controls="docWrap">Vis dokumentasjon</button>
+          <button class="btn primary" id="pdfBtn" type="button">Eksporter til PDF</button>
+        </div>
+      </div>
+      <p class="hint" id="pdfMsg" role="status">Dokumentasjonen inneholder inndata, geometri, teorigrunnlag med formler, diagram og alle beregnede verdier.</p>
+      <div id="docWrap" class="doc-wrap" hidden>
+      <div class="paper" id="report">
+        <div class="rb rep-head">
+          <div class="rep-kicker">Beregningsdokumentasjon</div>
+          <h1 id="rep-title">Horisontaltrykk mot vegg fra fundamentlast</h1>
+          <p class="rep-sub">Spenningsfordeling etter elastisitetsteori (Boussinesq/Cerruti, ν = 0,5)</p>
+          <p class="rep-meta" id="rep-date"></p>
+        </div>
+
+        <div class="rb"><h2>1 Inndata</h2><div id="rep-inputs"></div></div>
+
+        <div class="rb">
+          <h2>2 Geometri</h2>
+          <p>Koordinatsystemet har origo i P på terrengoverflaten. <i>x</i> er horisontal avstand vinkelrett ut fra veggen, <i>y</i> er avstand langs veggen og <i>z</i> er dybde. Lastflaten dekker <i>d</i> ≤ <i>x</i> ≤ <i>d</i>+<i>L</i> og <i>Y</i>−<i>B</i>/2 ≤ <i>y</i> ≤ <i>Y</i>+<i>B</i>/2.</p>
+          <div class="rep-geo"><div id="rep-plan"></div><div id="rep-rects"></div></div>
+        </div>
+
+        <div class="rb"><h2>3 Teorigrunnlag</h2>
+          <h3>3.1 Modell</h3>
+          <p>Jorden modelleres som et homogent, isotropt og lineært elastisk halvrom. Spenningene fra laster på overflaten av et slikt halvrom er uavhengige av elastisitetsmodulen, men horisontalspenningene avhenger av Poissons tall ν. Her brukes ν = 0,5, som svarer til volumkonstant (udrenert) deformasjon. Da faller leddene med faktoren (1 − 2ν) bort, og uttrykkene blir enkle.</p>
+          <p>Veggen inngår ikke i modellen. De beregnede spenningene er spenningene i halvrommet langs en loddrett linje gjennom P, der veggen står. Trykk regnes som positiv spenning.</p>
+        </div>
+        <div class="rb">
+          <h3>3.2 Punktlast på overflaten</h3>
+          <p>For en vertikal punktlast <i>Q</i> (Boussinesq) og en horisontal punktlast <i>H</i> (Cerruti) på overflaten er spenningene i dybden <i>z</i> under P gitt nedenfor for ν = 0,5. Her er <i>x</i> og <i>y</i> den horisontale avstanden fra P til lastpunktet, <i>x</i> vinkelrett ut fra veggen og <i>y</i> langs veggen:</p>
+          <div class="math" data-tex="R=\sqrt{x^2+y^2+z^2}"></div>
+          <div class="math" data-tex="\sigma_z^{(Q)}=\frac{3Q}{2\pi}\frac{z^3}{R^5}\qquad \sigma_x^{(Q)}=\frac{3Q}{2\pi}\frac{x^2 z}{R^5}"></div>
+          <div class="math" data-tex="\sigma_z^{(H)}=\frac{3H}{2\pi}\frac{x z^2}{R^5}\qquad \sigma_x^{(H)}=\frac{3H}{2\pi}\frac{x^3}{R^5}"></div>
+          <p>Uttrykkene for σ<sub><i>z</i></sub> gjelder for alle verdier av ν. For andre verdier enn 0,5 får uttrykkene for σ<sub><i>x</i></sub> tilleggsledd med faktoren (1 − 2ν). <i>H</i> er positiv når den virker mot veggen, det vil si fra lastpunktet mot P, og gir da trykk i P.</p>
+        </div>
+        <div class="rb">
+          <h3>3.3 Rektangulær flatelast med hjørne over P</h3>
+          <p>Integrasjon av punktlastløsningene over et rektangel med sider <i>L</i> (i <i>x</i>-retningen) og <i>b</i> (i <i>y</i>-retningen), med ett hjørne rett over P og jevnt fordelte laster <i>q</i><sub>v</sub> og <i>q</i><sub>h</sub>, gir følgende spenninger i dybden <i>z</i>:</p>
+          <div class="math" data-tex="R_1=\sqrt{L^2+z^2}\qquad R_2=\sqrt{b^2+z^2}\qquad R_3=\sqrt{L^2+b^2+z^2}"></div>
+        </div>
+        <div class="rb">
+          <div class="math" data-tex="\sigma_z(q_v)=\frac{q_v}{2\pi}\left[\arctan\frac{Lb}{zR_3}+\frac{Lbz}{R_3}\left(\frac{1}{R_1^2}+\frac{1}{R_2^2}\right)\right]"></div>
+          <div class="math" data-tex="\sigma_x(q_v)=\frac{q_v}{2\pi}\left[\arctan\frac{Lb}{zR_3}-\frac{Lbz}{R_1^2R_3}\right]"></div>
+          <div class="math" data-tex="\sigma_z(q_h)=\frac{q_h}{2\pi}\left[\frac{b}{R_2}-\frac{z^2 b}{R_1^2R_3}\right]"></div>
+          <div class="math" data-tex="\sigma_x(q_h)=\frac{q_h}{\pi}\left[\ln\frac{R_1\,(b+R_2)}{z\,(b+R_3)}-\frac{L^2 b}{2R_1^2R_3}\right]"></div>
+          <p class="small">Uttrykket for σ<sub><i>z</i></sub>(<i>q</i><sub>v</sub>) er Holls (1940) løsning for spenningen under hjørnet av en rektangulær last. Alle fire uttrykkene er kontrollert ved numerisk integrasjon av punktlastløsningene i 3.2 over rektangelet, med samsvar til minst seks siffer.</p>
+        </div>
+        <div class="rb">
+          <h3>3.4 Hjørnepunktmetoden</h3>
+          <p>Lastflaten ligger ikke med hjørnet over P. Den uttrykkes derfor som summen av fire rektangler som alle har hjørne over P, med fortegn <i>s</i><sub><i>i</i></sub> = ±1 (tabellen i kapittel 2). Bredden <i>b</i> kan være negativ; uttrykkene i 3.3 gir da riktig fortegn automatisk.</p>
+          <div class="math" data-tex="\sigma(z)=\sum_{i=1}^{4} s_i\,\sigma\!\left(L_i,\,b_i,\,z\right)"></div>
+        </div>
+        <div class="rb">
+          <h3>3.5 Totale spenninger</h3>
+          <p>Egenvekten av jorden legges til som en lineært økende spenning. Faktoren <i>f</i> er 2 når «perfekt stiv vegg» er valgt og ellers 1.</p>
+          <div class="math" data-tex="\sigma_{z,\mathrm{tot}}=\sum s_i\left[\sigma_z(q_v)+\sigma_z(q_h)\right]+\gamma z"></div>
+          <div class="math" data-tex="\sigma_{x,\mathrm{tot}}=f\sum s_i\left[\sigma_x(q_v)+\sigma_x(q_h)\right]+K_0\,\gamma z"></div>
+          <p>Til sammenligning vises også det forenklede anslaget σ<sub>z,tot</sub>·<i>K</i><sub>0</sub>, der horisontalspenningen settes lik vertikalspenningen ganget med hviletrykkskoeffisienten.</p>
+          <p>Faktoren 2 for stiv vegg bygger på speilingsprinsippet (Mindlin, 1936). En perfekt stiv og glatt vegg som hindrer horisontal forskyvning, svarer til at lasten og et speilbilde av lasten på motsatt side av veggen virker samtidig på halvrommet. I veggplanet gir de to lastene like store bidrag, slik at horisontalspenningen dobles. Spangler (1936) målte horisontaltrykk på en stiv vegg av denne størrelsen. For vegger som kan gi etter, blir faktoren mindre enn 2.</p>
+        </div>
+        <div class="rb">
+          <h3>3.6 Resultanter</h3>
+          <p>Spenningene beregnes i <i>n</i> + 1 punkter fra <i>z</i><sub>0</sub> = 0,001 m til <i>z</i><sub>0</sub> + <i>D</i><sub>f</sub>. Resultantene finnes ved trapesintegrasjon. <i>P</i><sub>h</sub> er resultanten av horisontalspenningen per meter vegg i snittet gjennom P. <i>P</i><sub>v</sub> er integralet av vertikalspenningen langs den samme linjen; den er tatt med for sammenligning, som i regnearket, og er ingen kraft på veggen. Når γ > 0, inngår egenvekten i begge.</p>
+          <div class="math" data-tex="P_h=\sum_{j=0}^{n-1}\tfrac12\left(\sigma_{x,j}+\sigma_{x,j+1}\right)\Delta z\qquad P_v=\sum_{j=0}^{n-1}\tfrac12\left(\sigma_{z,j}+\sigma_{z,j+1}\right)\Delta z"></div>
+          <div class="math" data-tex="M=\sum_{j=0}^{n-1}\tfrac12\left(\sigma_{x,j}+\sigma_{x,j+1}\right)\Delta z\cdot\frac{z_j+z_{j+1}}{2}\qquad z_h=\frac{M}{P_h}"></div>
+          <p><i>z</i><sub>h</sub> er dybden til angrepspunktet for <i>P</i><sub>h</sub>, målt fra terreng.</p>
+        </div>
+
+        <div class="rb"><h2>4 Resultater</h2><div id="rep-res"></div></div>
+        <div class="rb"><div id="rep-chart"></div></div>
+        <div id="rep-tables"></div>
+
+        <div class="rb"><h2>5 Forutsetninger og begrensninger</h2>
+          <ul>
+            <li>Løsningen forutsetter homogen, isotrop og lineært elastisk jord. Lagdeling, plastisering og jordas fasthet er ikke tatt hensyn til.</li>
+            <li>Veggens stivhet inngår ikke i modellen. Faktoren 2 for perfekt stiv og glatt vegg er en grenseverdi; for en virkelig vegg ligger faktoren mellom 1 og 2.</li>
+            <li>Når lasten står helt inntil veggen (<i>d</i> = 0), er uttrykket for σ<sub><i>x</i></sub>(<i>q</i><sub>h</sub>) singulært i overflaten, og σ<sub><i>z</i></sub> er diskontinuerlig der. Første beregningspunkt ligger derfor i <i>z</i> = 0,001 m. Når lasten står nær veggen, endrer spenningene seg raskt like under terreng, og resultantene blir følsomme for antall intervaller.</li>
+            <li>Egenvekten er tatt med som γ<i>z</i> og <i>K</i><sub>0</sub>γ<i>z</i> uten grunnvann eller poretrykk. Bruk effektiv tyngdetetthet under grunnvannsstanden om nødvendig.</li>
+          </ul>
+        </div>
+        <div class="rb"><h2>6 Referanser</h2>
+          <ul class="refs">
+            <li>Boussinesq, J. (1885). <i>Application des potentiels à l’étude de l’équilibre et du mouvement des solides élastiques.</i> Gauthier-Villars, Paris.</li>
+            <li>Cerruti, V. (1882). Ricerche intorno all’equilibrio de’ corpi elastici isotropi. <i>Atti della Reale Accademia dei Lincei, Memorie della Classe di scienze fisiche, matematiche e naturali</i>, serie 3, vol. 13. Roma.</li>
+            <li>Holl, D.L. (1940). Stress transmission in earths. <i>Proceedings, Highway Research Board</i>, 20, 709–721.</li>
+            <li>Mindlin, R.D. (1936). Discussion: Pressure distribution on retaining walls. <i>Proceedings, 1st International Conference on Soil Mechanics and Foundation Engineering</i>, Cambridge, Mass., vol. 3.</li>
+            <li>Poulos, H.G. og Davis, E.H. (1974). <i>Elastic Solutions for Soil and Rock Mechanics.</i> Wiley, New York.</li>
+            <li>Spangler, M.G. (1936). The distribution of normal pressure on a retaining wall due to a concentrated surface load. <i>Proceedings, 1st International Conference on Soil Mechanics and Foundation Engineering</i>, Cambridge, Mass., vol. 1.</li>
+            <li>Athanasiu, C. (1994). Regneark VEGG.XLS, ark hspenn1, versjon 1.0 (01.06.1994).</li>
+          </ul>
+        </div>
+      </div>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+<script>
+// Spenninger under hjørnet av et rektangel L x b med jevnt fordelt qv og qh
+// (Boussinesq/Cerruti-integrasjon, Poissons tall 0,5) — samme uttrykk som hspenn1.
+function cornerStress(L, b, qv, qh, z) {
+  const R1 = Math.sqrt(L * L + z * z);
+  const R2 = Math.sqrt(b * b + z * z);
+  const R3 = Math.sqrt(L * L + b * b + z * z);
+  const arg1 = (L * b) / (z * R3);
+  const arg2 = ((L * b * z) / R3) * (1 / (R1 * R1) + 1 / (R2 * R2));
+  const szv = (qv / (2 * Math.PI)) * (Math.atan(arg1) + arg2);
+  const szh = ((b / R2 - (z * z * b) / (R1 * R1 * R3)) * qh) / Math.PI / 2;
+  const sxv = (qv / (2 * Math.PI)) * (Math.atan(arg1) - (L * b * z) / (R1 * R1 * R3));
+  let sxh = 0;
+  if (L !== 0 && qh !== 0) {
+    sxh = (qh / Math.PI) *
+      (Math.log((R1 * (b + R2)) / z / (b + R3)) - (L * L * b) / 2 / (R1 * R1) / R3);
+  }
+  return { szv, szh, sxv, sxh };
+}
+
+function compute(p) {
+  // p: B, L, Y, d, qv, qh, gamma, ko, Df, n, z0, rigid
+  const rects = [
+    { L: p.d + p.L, b: p.B / 2 + p.Y, s: 1 },
+    { L: p.d + p.L, b: p.Y - p.B / 2, s: -1 },
+    { L: p.d,       b: p.B / 2 + p.Y, s: -1 },
+    { L: p.d,       b: p.Y - p.B / 2, s: 1 },
+  ];
+  const f = p.rigid ? 2 : 1;
+  const rows = [];
+  for (let i = 0; i <= p.n; i++) {
+    const z = p.z0 + (p.Df / p.n) * i;
+    let szv = 0, szh = 0, sxv = 0, sxh = 0;
+    for (const r of rects) {
+      const c = cornerStress(r.L, r.b, r.s * p.qv, r.s * p.qh, z);
+      szv += c.szv; szh += c.szh; sxv += c.sxv; sxh += c.sxh;
+    }
+    const sz = szv + szh + p.gamma * z;
+    const szko = sz * p.ko;
+    const sx = f * (sxv + sxh) + p.gamma * z * p.ko;
+    rows.push({ z, szv, szh, sz, szko, sxv, sxh, sx });
+  }
+  let Qv = 0, Qh = 0, M = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const a = rows[i - 1], b = rows[i], dz = b.z - a.z;
+    Qv += 0.5 * (a.sz + b.sz) * dz;
+    const dq = 0.5 * (a.sx + b.sx) * dz;
+    Qh += dq;
+    M += dq * (a.z + b.z) / 2;
+  }
+  return { rows, Qv, Qh, M, zh: Qh !== 0 ? M / Qh : NaN };
+}
+
+const NS = "http://www.w3.org/2000/svg";
+const ids = ["B","L","d","Y","qv","qh","gamma","ko","Df","n"];
+const $ = id => document.getElementById(id);
+let scale = "lin", last = null, hoverIdx = -1;
+
+function evalExpr(s) {
+  s = String(s).trim().replace(/,/g, ".").replace(/^=/, "");
+  if (!s || !/^[0-9.+\-*/()\seE]+$/.test(s)) return NaN;
+  try { const v = Function('"use strict";return (' + s + ")")(); return typeof v === "number" && isFinite(v) ? v : NaN; }
+  catch (e) { return NaN; }
+}
+const nf = (v, d) => v.toLocaleString("nb-NO", { minimumFractionDigits: d, maximumFractionDigits: d });
+function fmt(v) {
+  if (!isFinite(v)) return "–";
+  const a = Math.abs(v);
+  if (a === 0) return "0";
+  if (a >= 100) return nf(v, 1);
+  if (a >= 1) return nf(v, 2);
+  if (a >= 0.001) return nf(v, 3);
+  return v.toExponential(2).replace(".", ",");
+}
+function el(tag, attrs, parent, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function readInputs() {
+  const p = {}, bad = [];
+  for (const id of ids) {
+    const v = evalExpr($(id).value);
+    p[id] = v;
+    let ok = isFinite(v);
+    if (["B","L","Df"].includes(id) && !(v > 0)) ok = false;
+    if (id === "d" && !(v >= 0)) ok = false;
+    if (id === "n" && !(Number.isInteger(v) && v >= 2 && v <= 1000)) ok = false;
+    $(id).classList.toggle("bad", !ok);
+    $(id).setAttribute("aria-invalid", ok ? "false" : "true");
+    if (!ok) bad.push(id);
+  }
+  p.rigid = $("rigid").checked;
+  p.z0 = 0.001;
+  return { p, bad };
+}
+
+const names = {B:"B",L:"L",d:"d",Y:"Y",qv:"qv",qh:"qh",gamma:"γ",ko:"K0",Df:"Df",n:"antall intervaller"};
+function update() {
+  save();
+  const { p, bad } = readInputs();
+  if (bad.length) {
+    $("err").textContent = "Sjekk " + bad.map(b => names[b]).join(", ") + ". B, L og Df må være større enn 0, d kan ikke være negativ, og antall intervaller må være et heltall fra 2 til 1000.";
+    return;
+  }
+  $("err").textContent = "";
+  $("totals").textContent = `Samlet last: Qv = ${fmt(p.qv*p.B*p.L)} kN, Qh = ${fmt(p.qh*p.B*p.L)} kN.`;
+  last = { p, r: compute(p) };
+  drawPlan(p);
+  drawChart();
+  drawResultants();
+  drawTable();
+  buildReport();
+}
+
+function drawPlan(p) {
+  const svg = $("plan"); svg.innerHTML = "";
+  const W = 360, H = 300, pl = 40, pr = 84, pt = 44, pb = 24;
+  const xmin = Math.min(0, p.d) , xmax = p.d + p.L;
+  const ymin = Math.min(0, p.Y - p.B/2), ymax = Math.max(0, p.Y + p.B/2);
+  const aw = W - pl - pr, ah = H - pt - pb;
+  const s = Math.min(aw / Math.max(xmax - xmin, 1e-9), ah / Math.max(ymax - ymin, 1e-9));
+  const ox = pl + (aw - (xmax - xmin)*s)/2 - xmin*s;
+  const oy = pt + (ah - (ymax - ymin)*s)/2 + ymax*s;
+  const X = x => ox + x*s, Yp = y => oy - y*s;
+  // jord bak vegg
+  el("rect", {x: X(0), y: 8, width: W - X(0) - 4, height: H - 16, fill: "var(--soil)", opacity: ".45"}, svg);
+  // vegg
+  el("rect", {x: X(0) - 9, y: 8, width: 9, height: H - 16, fill: "var(--wall)"}, svg);
+  el("text", {x: X(0) - 14, y: 22, "text-anchor": "end", "font-size": 12, fill: "var(--muted)"}, svg, "Vegg");
+  // lastflate
+  el("rect", {x: X(p.d), y: Yp(p.Y + p.B/2), width: p.L*s, height: p.B*s, fill: "var(--load)", stroke: "var(--ochre)", "stroke-width": 1.5}, svg);
+  // qh-pil
+  if (p.qh !== 0) {
+    const cy = Yp(p.Y), x1 = X(p.d + p.L) - 4, x0 = X(p.d) + 4;
+    const len = Math.min(48, Math.max(18, p.L*s*0.7));
+    const xc = (x0 + x1)/2, dir = p.qh > 0 ? -1 : 1;
+    const a = xc - dir*len/2, b = xc + dir*len/2;
+    el("line", {x1: a, y1: cy, x2: b, y2: cy, stroke: "var(--ochre)", "stroke-width": 2.5}, svg);
+    el("path", {d: `M${b} ${cy} l${-dir*8} -5 v10 z`, fill: "var(--ochre)"}, svg);
+    el("text", {x: xc, y: cy - 9, "text-anchor": "middle", "font-size": 12, fill: "var(--ochre)", "font-style": "italic"}, svg, "qh");
+  }
+  // punkt P
+  el("circle", {cx: X(0), cy: Yp(0), r: 4.5, fill: "var(--steel)"}, svg);
+  el("text", {x: X(0) + 7, y: Yp(0) + 17, "font-size": 13, "font-weight": 600, fill: "var(--steel)"}, svg, "P");
+  // mål
+  const dim = (x1, y1, x2, y2, label, off) => {
+    const g = el("g", {stroke: "var(--muted)", "stroke-width": 1}, svg);
+    el("line", {x1, y1, x2, y2}, g);
+    const ang = Math.atan2(y2 - y1, x2 - x1), t = 4;
+    for (const [x, y] of [[x1, y1], [x2, y2]]) el("line", {x1: x - Math.sin(ang)*t, y1: y + Math.cos(ang)*t, x2: x + Math.sin(ang)*t, y2: y - Math.cos(ang)*t}, g);
+    el("text", {x: (x1 + x2)/2 + off[0], y: (y1 + y2)/2 + off[1], "text-anchor": "middle", "font-size": 12, fill: "var(--ink)", stroke: "none"}, svg, label);
+  };
+  const ytop = Yp(Math.max(p.Y + p.B/2, 0)) - 16;
+  if (p.d > 0) dim(X(0), ytop, X(p.d), ytop, "d = " + fmt(p.d), [0, -5]);
+  dim(X(p.d), ytop, X(p.d + p.L), ytop, "L = " + fmt(p.L), [0, -5]);
+  const xr = X(p.d + p.L) + 16;
+  dim(xr, Yp(p.Y + p.B/2), xr, Yp(p.Y - p.B/2), "B = " + fmt(p.B), [0, 0]);
+  svg.lastChild.setAttribute("text-anchor", "start"); svg.lastChild.setAttribute("x", xr + 6);
+  if (p.Y !== 0) {
+    const xl = X(0) + 16;
+    el("line", {x1: X(0), y1: Yp(p.Y), x2: X(p.d + p.L/2), y2: Yp(p.Y), stroke: "var(--muted)", "stroke-dasharray": "3 3"}, svg);
+    dim(xl, Yp(0), xl, Yp(p.Y), "Y = " + fmt(p.Y), [0, 0]);
+    svg.lastChild.setAttribute("text-anchor", "start"); svg.lastChild.setAttribute("x", xl + 6);
+  }
+}
+
+const series = [
+  { key: "sx", color: "var(--steel)", w: 2.5 },
+  { key: "sz", color: "var(--ochre)", w: 2 },
+  { key: "szko", color: "var(--moss)", w: 2, dash: "6 4" },
+];
+
+function niceStep(range, target) {
+  const raw = range / target, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / mag;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+}
+
+function drawChart() {
+  const svg = $("chart"); svg.innerHTML = "";
+  const { p, r } = last;
+  const W = 720, H = 540, m = { l: 62, r: 22, t: 30, b: 44 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const vals = r.rows.flatMap(row => series.map(s => row[s.key]));
+  let X;
+  const zmax = p.Df + p.z0;
+  const Yz = z => m.t + (z / zmax) * ph;
+  const ga = el("g", {"font-size": 12, fill: "var(--muted)"}, svg);
+  if (scale === "lin") {
+    let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+    if (hi - lo < 1e-12) hi = lo + 1;
+    const st = niceStep(hi - lo, 6);
+    lo = Math.floor(lo / st) * st; hi = Math.ceil(hi / st) * st;
+    X = v => m.l + (v - lo) / (hi - lo) * pw;
+    for (let v = lo; v <= hi + st*1e-6; v += st) {
+      el("line", {x1: X(v), x2: X(v), y1: m.t, y2: m.t + ph, stroke: "var(--line)", "stroke-width": Math.abs(v) < st*1e-6 ? 1.5 : 1}, svg);
+      el("text", {x: X(v), y: m.t - 10, "text-anchor": "middle"}, ga, Math.abs(v) < st*1e-6 ? "0" : nf(v, st >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(st)))));
+    }
+  } else {
+    const pos = vals.filter(v => v > 0);
+    let hi = pos.length ? Math.max(...pos) : 1;
+    let lo = pos.length ? Math.min(...pos) : 0.1;
+    let dhi = Math.ceil(Math.log10(hi)), dlo = Math.floor(Math.log10(lo));
+    dlo = Math.max(dlo, dhi - 8); if (dhi === dlo) dhi++;
+    X = v => v > 0 ? m.l + (Math.log10(v) - dlo) / (dhi - dlo) * pw : NaN;
+    for (let e = dlo; e <= dhi; e++) {
+      el("line", {x1: X(10**e), x2: X(10**e), y1: m.t, y2: m.t + ph, stroke: "var(--line)"}, svg);
+      el("text", {x: X(10**e), y: m.t - 10, "text-anchor": "middle"}, ga, e >= 0 && e <= 4 ? nf(10**e, 0) : "10" + String(e).replace("-", "−").replace(/\d/g, d => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]).replace("−", "⁻"));
+    }
+    svg.dataset.loglo = 10**dlo;
+  }
+  // dybdeakse
+  const zst = niceStep(zmax, 8);
+  for (let z = 0; z <= zmax + 1e-9; z += zst) {
+    el("line", {x1: m.l, x2: m.l + pw, y1: Yz(z), y2: Yz(z), stroke: "var(--line)", "stroke-dasharray": "2 4"}, svg);
+    el("text", {x: m.l - 8, y: Yz(z) + 4, "text-anchor": "end"}, ga, nf(z, zst < 1 ? 1 : 0));
+  }
+  el("line", {x1: m.l, x2: m.l + pw, y1: m.t, y2: m.t, stroke: "var(--ink)", "stroke-width": 1.5}, svg);
+  el("text", {x: 14, y: m.t + ph/2, transform: `rotate(-90 14 ${m.t + ph/2})`, "text-anchor": "middle", "font-size": 13, fill: "var(--ink)"}, svg, "Dybde z (m)");
+  el("text", {x: m.l + pw/2, y: H - 12, "text-anchor": "middle", "font-size": 13, fill: "var(--ink)"}, svg, "Spenning (kPa)" + (scale === "log" ? ", logaritmisk – bare positive verdier vises" : ""));
+  // kurver
+  const clip = el("clipPath", {id: "plotclip"}, el("defs", {}, svg));
+  el("rect", {x: m.l, y: m.t - 6, width: pw, height: ph + 12}, clip);
+  const gp = el("g", {"clip-path": "url(#plotclip)"}, svg);
+  for (const s of [...series].reverse()) {
+    const pts = r.rows.map(row => [X(row[s.key]), Yz(row.z)]).filter(q => isFinite(q[0]));
+    if (pts.length < 2) continue;
+    el("polyline", {points: pts.map(q => q.join(",")).join(" "), fill: "none", stroke: s.color, "stroke-width": s.w, "stroke-dasharray": s.dash || "none", "stroke-linejoin": "round"}, gp);
+    if (r.rows.length <= 60) for (const q of pts) el("circle", {cx: q[0], cy: q[1], r: 3, fill: s.color}, gp);
+  }
+  // resultant Qh
+  if (isFinite(r.zh) && r.zh > 0 && r.zh < zmax) {
+    el("line", {x1: m.l + pw - 70, x2: m.l + pw, y1: Yz(r.zh), y2: Yz(r.zh), stroke: "var(--steel)", "stroke-width": 1, "stroke-dasharray": "2 2"}, svg);
+    el("text", {x: m.l + pw - 4, y: Yz(r.zh) - 5, "text-anchor": "end", "font-size": 12, fill: "var(--steel)"}, svg, "zh = " + fmt(r.zh) + " m");
+  }
+  // hover
+  const hov = el("g", {visibility: "hidden"}, svg);
+  const hl = el("line", {x1: m.l, x2: m.l + pw, stroke: "var(--ink)", "stroke-width": 1}, hov);
+  const hb = el("rect", {width: 196, height: 76, rx: 3, fill: "var(--panel)", stroke: "var(--line)"}, hov);
+  const ht = [0,1,2,3].map(i => el("text", {"font-size": 12.5, fill: i === 0 ? "var(--ink)" : series[i-1].color}, hov));
+  const show = idx => {
+    hoverIdx = idx;
+    document.querySelectorAll("#tbl tbody tr").forEach((tr, i) => tr.classList.toggle("hl", i === idx));
+    if (idx < 0) { hov.setAttribute("visibility", "hidden"); return; }
+    const row = r.rows[idx], y = Yz(row.z);
+    hov.setAttribute("visibility", "visible");
+    hl.setAttribute("y1", y); hl.setAttribute("y2", y);
+    const by = Math.min(Math.max(y + 8, m.t), m.t + ph - 78), bx = m.l + pw - 202;
+    hb.setAttribute("x", bx); hb.setAttribute("y", by);
+    const lines = [`z = ${fmt(row.z)} m`, `σx,tot = ${fmt(row.sx)} kPa`, `σz,tot = ${fmt(row.sz)} kPa`, `σz,tot·K0 = ${fmt(row.szko)} kPa`];
+    ht.forEach((t, i) => { t.setAttribute("x", bx + 10); t.setAttribute("y", by + 18 + i*17); t.textContent = lines[i]; });
+  };
+  svg.onpointermove = ev => {
+    const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    const loc = pt.matrixTransform(svg.getScreenCTM().inverse());
+    if (loc.y < m.t - 10 || loc.y > m.t + ph + 10) return show(-1);
+    const z = (loc.y - m.t) / ph * zmax;
+    let best = 0; r.rows.forEach((row, i) => { if (Math.abs(row.z - z) < Math.abs(r.rows[best].z - z)) best = i; });
+    show(best);
+  };
+  svg.onpointerleave = () => show(-1);
+}
+
+function drawResultants() {
+  const { r } = last;
+  $("res").innerHTML = `
+    <div><small>Horisontal resultant <span class="sym">P</span><sub>h</sub></small><b class="sx">${fmt(r.Qh)}<span>kN/m</span></b></div>
+    <div><small>Angrepspunkt <span class="sym">z</span><sub>h</sub> under terreng</small><b>${fmt(r.zh)}<span>m</span></b></div>
+    <div><small>Moment <span class="sym">M</span> om terreng</small><b>${fmt(r.M)}<span>kNm/m</span></b></div>
+    <div><small>Vertikal integral <span class="sym">P</span><sub>v</sub></small><b class="sz">${fmt(r.Qv)}<span>kN/m</span></b></div>`;
+}
+
+function drawTable() {
+  const { r } = last;
+  const head = `<thead><tr><th>z (m)</th><th>σ<sub>z</sub> fra q<sub>v</sub></th><th>σ<sub>z</sub> fra q<sub>h</sub></th><th class="sz">σ<sub>z,tot</sub></th><th class="sk">σ<sub>z,tot</sub>·K<sub>0</sub></th><th>σ<sub>x</sub> fra q<sub>v</sub></th><th>σ<sub>x</sub> fra q<sub>h</sub></th><th class="sx">σ<sub>x,tot</sub></th></tr></thead>`;
+  const body = r.rows.map(x => `<tr><td>${nf(x.z, 3)}</td><td>${fmt(x.szv)}</td><td>${fmt(x.szh)}</td><td>${fmt(x.sz)}</td><td>${fmt(x.szko)}</td><td>${fmt(x.sxv)}</td><td>${fmt(x.sxh)}</td><td><b>${fmt(x.sx)}</b></td></tr>`).join("");
+  $("tbl").innerHTML = head + "<tbody>" + body + "</tbody>";
+  $("tbl").insertAdjacentHTML("afterbegin", `<caption style="text-align:left;color:var(--muted);font-size:12.5px;padding-bottom:4px">Spenninger i kPa. Kolonnene «fra q» viser lastbidraget uten faktor for stiv vegg; totalene inkluderer egenvekt.</caption>`);
+}
+
+function save() {
+  try {
+    const o = { rigid: $("rigid").checked, tittel: $("tittel").value };
+    for (const id of ids) o[id] = $(id).value;
+    localStorage.setItem("hspenn1-inndata-v2", JSON.stringify(o));
+  } catch (e) {}
+}
+function load(o) {
+  for (const id of ids) if (o[id] != null) $(id).value = o[id];
+  if (o.rigid != null) $("rigid").checked = !!o.rigid;
+  if (o.tittel != null) $("tittel").value = o.tittel;
+}
+try { const s = localStorage.getItem("hspenn1-inndata-v2"); if (s) load(JSON.parse(s)); } catch (e) {}
+
+for (const id of ids) $(id).addEventListener("input", update);
+$("rigid").addEventListener("change", update);
+$("tittel").addEventListener("input", () => { save(); buildReport(); document.title = $("tittel").value ? $("tittel").value + " – horisontaltrykk" : "Horisontaltrykk"; });
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+  scale = b.dataset.scale;
+  document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  drawChart();
+}));
+$("copy").addEventListener("click", async () => {
+  if (!last) return;
+  const lines = [$("tittel").value, "z (m)\tsz_qv\tsz_qh\tsz_tot\tsz_tot*K0\tsx_qv\tsx_qh\tsx_tot"];
+  for (const x of last.r.rows) lines.push([x.z, x.szv, x.szh, x.sz, x.szko, x.sxv, x.sxh, x.sx].map(v => String(+v.toPrecision(6)).replace(".", ",")).join("\t"));
+  lines.push("", `Ph\t${String(+last.r.Qh.toPrecision(6)).replace(".", ",")}\tkN/m`, `zh\t${String(+last.r.zh.toPrecision(6)).replace(".", ",")}\tm`, `Pv\t${String(+last.r.Qv.toPrecision(6)).replace(".", ",")}\tkN/m`);
+  try { await navigator.clipboard.writeText(lines.join("\n")); $("copy").textContent = "Kopiert"; }
+  catch (e) { $("copy").textContent = "Kopiering ikke tillatt"; }
+  setTimeout(() => $("copy").textContent = "Kopier tabell", 1800);
+});
+
+// ---------- Dokumentasjon ----------
+const LIGHT = {"--bg":"#E9ECEB","--panel":"#FFFFFF","--ink":"#1C2630","--muted":"#5B6873","--line":"#D5DADC","--steel":"#2A5B87","--ochre":"#A5661A","--moss":"#5F7C55","--soil":"#D9CDB4","--soil-ink":"#8B7A58","--wall":"#3B4650","--load":"rgba(165,102,26,.18)"};
+function lightSvg(src, w) {
+  const c = src.cloneNode(true);
+  c.removeAttribute("id");
+  c.querySelectorAll('g[visibility="hidden"]').forEach(g => g.remove());
+  let s = new XMLSerializer().serializeToString(c);
+  s = s.replace(/var\((--[a-z-]+)\)/g, (m, k) => LIGHT[k] || "#1C2630");
+  s = s.replace(/clip-path="url\(#plotclip\)"/g, 'clip-path="url(#plotclipR)"').replace('id="plotclip"', 'id="plotclipR"');
+  const box = document.createElement("div"); box.innerHTML = s;
+  const svg = box.firstElementChild;
+  svg.setAttribute("font-family", "Archivo, Helvetica, Arial, sans-serif");
+  svg.setAttribute("width", w); svg.setAttribute("height", Math.round(w * svg.viewBox.baseVal.height / svg.viewBox.baseVal.width));
+  return svg;
+}
+const repTitle = () => $("tittel").value.trim();
+
+function buildReport() {
+  if (!last) return;
+  const { p, r } = last;
+  $("rep-title").textContent = repTitle() || "Horisontaltrykk mot vegg fra fundamentlast";
+  $("rep-date").textContent = "Dato: " + new Date().toLocaleDateString("nb-NO", { day: "2-digit", month: "2-digit", year: "numeric" }) + ". Programmet er basert på regnearket VEGG.XLS (ark hspenn1) av Corneliu Athanasiu.";
+  const rows = [
+    ["<i>B</i>", "Bredde av lastflaten langs veggen", fmt(p.B), "m"],
+    ["<i>L</i>", "Lengde av lastflaten vinkelrett på veggen", fmt(p.L), "m"],
+    ["<i>d</i>", "Avstand fra P (vegg) til nærmeste lastkant", fmt(p.d), "m"],
+    ["<i>Y</i>", "Avstand langs veggen fra P til midten av lastflaten", fmt(p.Y), "m"],
+    ["<i>q</i><sub>v</sub>", "Jevnt fordelt vertikal last", fmt(p.qv), "kPa"],
+    ["<i>q</i><sub>h</sub>", "Jevnt fordelt horisontal last, positiv mot veggen", fmt(p.qh), "kPa"],
+    ["<i>Q</i><sub>v</sub>", "Samlet vertikal last, <i>q</i><sub>v</sub>·<i>B</i>·<i>L</i>", fmt(p.qv * p.B * p.L), "kN"],
+    ["<i>Q</i><sub>h</sub>", "Samlet horisontal last, <i>q</i><sub>h</sub>·<i>B</i>·<i>L</i>", fmt(p.qh * p.B * p.L), "kN"],
+    ["γ", "Tyngdetetthet av jord", fmt(p.gamma), "kN/m³"],
+    ["<i>K</i><sub>0</sub>", "Hviletrykkskoeffisient", fmt(p.ko), "–"],
+    ["<i>D</i><sub>f</sub>", "Dybde diagrammet strekker seg over", fmt(p.Df), "m"],
+    ["<i>n</i>", "Antall intervaller (<i>n</i>+1 beregningspunkter)", String(p.n), "–"],
+    ["<i>z</i><sub>0</sub>", "Dybde for første beregningspunkt", "0,001", "m"],
+    ["<i>f</i>", "Faktor for stiv vegg på lastbidraget til σ<sub>x</sub>", p.rigid ? "2 (perfekt stiv vegg)" : "1 (ingen vegg i modellen)", "–"],
+    ["ν", "Poissons tall", "0,5", "–"],
+  ];
+  $("rep-inputs").innerHTML = `<table><thead><tr><th class="l">Symbol</th><th class="l">Beskrivelse</th><th>Verdi</th><th class="l">Enhet</th></tr></thead><tbody>${rows.map(x => `<tr><td class="l">${x[0]}</td><td class="l">${x[1]}</td><td>${x[2]}</td><td class="l">${x[3]}</td></tr>`).join("")}</tbody></table>`;
+
+  const rects = [[p.d + p.L, p.B/2 + p.Y, "+1", "d+L", "B/2+Y"], [p.d + p.L, p.Y - p.B/2, "−1", "d+L", "Y−B/2"], [p.d, p.B/2 + p.Y, "−1", "d", "B/2+Y"], [p.d, p.Y - p.B/2, "+1", "d", "Y−B/2"]];
+  $("rep-rects").innerHTML = `<p style="margin-top:0"><b>Rektangler i hjørnepunktmetoden</b></p><table><thead><tr><th class="l"><i>i</i></th><th><i>L<sub>i</sub></i> (m)</th><th><i>b<sub>i</sub></i> (m)</th><th><i>s<sub>i</sub></i></th></tr></thead><tbody>${rects.map((x, i) => `<tr><td class="l">${i + 1}</td><td><i>${x[3]}</i> = ${fmt(x[0])}</td><td><i>${x[4]}</i> = ${fmt(x[1])}</td><td>${x[2]}</td></tr>`).join("")}</tbody></table><p class="small">Rektangler med <i>L<sub>i</sub></i> = 0 eller <i>b<sub>i</sub></i> = 0 gir ingen bidrag.</p>`;
+  $("rep-plan").replaceChildren(lightSvg($("plan"), 300));
+
+  $("rep-res").innerHTML = `<p>Resultanter integrert fra <i>z</i> = 0,001 m til <i>z</i> = ${fmt(p.Df + p.z0)} m:</p>
+    <div class="rep-res">
+      <div><small>Horisontal resultant <i>P</i><sub>h</sub></small><b style="color:#2A5B87">${fmt(r.Qh)} kN/m</b></div>
+      <div><small>Angrepspunkt <i>z</i><sub>h</sub> under terreng</small><b>${fmt(r.zh)} m</b></div>
+      <div><small>Moment <i>M</i> om terreng</small><b>${fmt(r.M)} kNm/m</b></div>
+      <div><small>Vertikal integral <i>P</i><sub>v</sub></small><b style="color:#A5661A">${fmt(r.Qv)} kN/m</b></div>
+    </div>`;
+  $("rep-chart").replaceChildren();
+  const cap = document.createElement("p");
+  cap.innerHTML = `<b>Figur 1.</b> Spenninger mot dybde langs loddrett linje gjennom P${scale === "log" ? " (logaritmisk spenningsakse, bare positive verdier)" : ""}.`;
+  const leg = document.createElement("div"); leg.className = "rep-leg";
+  leg.innerHTML = `<span><span class="sw" style="border-color:#2A5B87"></span><span>σ<sub>x,tot</sub></span></span><span><span class="sw" style="border-color:#A5661A"></span><span>σ<sub>z,tot</sub></span></span><span><span class="sw" style="border-color:#5F7C55;border-top-style:dashed"></span><span>σ<sub>z,tot</sub>·<em>K</em><sub>0</sub></span></span>`;
+  $("rep-chart").append(cap, leg, lightSvg($("chart"), 640));
+
+  const head = `<thead><tr><th class="l">z (m)</th><th>σ<sub>z</sub>(q<sub>v</sub>)</th><th>σ<sub>z</sub>(q<sub>h</sub>)</th><th>σ<sub>z,tot</sub></th><th>σ<sub>z,tot</sub>·K<sub>0</sub></th><th>σ<sub>x</sub>(q<sub>v</sub>)</th><th>σ<sub>x</sub>(q<sub>h</sub>)</th><th>σ<sub>x,tot</sub></th></tr></thead>`;
+  const tw = $("rep-tables"); tw.replaceChildren();
+  const CH = 30;
+  for (let i = 0; i < r.rows.length; i += CH) {
+    const blk = document.createElement("div"); blk.className = "rb";
+    const part = r.rows.slice(i, i + CH);
+    blk.innerHTML = (i === 0 ? `<p><b>Tabell 1.</b> Spenninger i kPa i beregningspunktene. Kolonnene σ(q<sub>v</sub>) og σ(q<sub>h</sub>) er summen over de fire rektanglene, uten faktor for stiv vegg og uten egenvekt.</p>` : `<p class="small">Tabell 1, fortsettelse</p>`) +
+      `<table>${head}<tbody>${part.map(x => `<tr><td class="l">${nf(x.z, 3)}</td><td>${fmt(x.szv)}</td><td>${fmt(x.szh)}</td><td>${fmt(x.sz)}</td><td>${fmt(x.szko)}</td><td>${fmt(x.sxv)}</td><td>${fmt(x.sxh)}</td><td><b>${fmt(x.sx)}</b></td></tr>`).join("")}</tbody></table>`;
+    tw.appendChild(blk);
+  }
+}
+
+// formler (MathJax lastes asynkront)
+let mathDone = false;
+function typesetMath() {
+  if (mathDone || !window.MathJax || !MathJax.tex2svg) return;
+  document.querySelectorAll(".math[data-tex]").forEach(el => {
+    try {
+      const node = MathJax.tex2svg(el.dataset.tex, { display: true });
+      node.querySelectorAll("mjx-assistive-mml").forEach(m => m.remove());
+      el.setAttribute("role", "math"); el.setAttribute("aria-label", el.dataset.tex);
+      el.replaceChildren(node);
+    } catch (e) {}
+  });
+  mathDone = true;
+}
+document.querySelectorAll(".math[data-tex]").forEach(el => { el.textContent = el.dataset.tex.replace(/\\[a-z]+|[{}]/gi, " ").replace(/\s+/g, " "); });
+function waitMath(ms) {
+  return new Promise(res => {
+    const t0 = Date.now();
+    (function poll() {
+      if (window.MathJax && MathJax.startup && MathJax.startup.promise) { MathJax.startup.promise.then(() => { typesetMath(); res(); }); return; }
+      if (Date.now() - t0 > ms) return res();
+      setTimeout(poll, 150);
+    })();
+  });
+}
+waitMath(20000);
+
+$("toggleDoc").addEventListener("click", () => {
+  const w = $("docWrap"), open = w.hidden;
+  w.hidden = !open;
+  $("toggleDoc").setAttribute("aria-expanded", String(open));
+  $("toggleDoc").textContent = open ? "Skjul dokumentasjon" : "Vis dokumentasjon";
+});
+
+async function exportPdf() {
+  const btn = $("pdfBtn"), msg = $("pdfMsg");
+  if (!last) { msg.textContent = "Rett opp inndata før eksport."; return; }
+  if (!window.jspdf || !window.html2canvas) { msg.textContent = "PDF-bibliotekene er ikke lastet ennå. Prøv igjen om et øyeblikk."; return; }
+  btn.disabled = true; btn.textContent = "Lager PDF …";
+  const w = $("docWrap"), wasHidden = w.hidden;
+  try {
+    await waitMath(8000);
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    buildReport();
+    w.hidden = false;
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
+    const PW = 210, PH = 297, ML = 18, MR = 18, MT = 18, MB = 16, CW = PW - ML - MR;
+    let y = MT;
+    const blocks = [...$("report").querySelectorAll(".rb")];
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      msg.textContent = `Lager PDF … ${Math.round(100 * i / blocks.length)} %`;
+      const canvas = await html2canvas(b, { scale: 2, backgroundColor: "#ffffff", logging: false, useCORS: true, onclone: doc => doc.querySelectorAll("mjx-assistive-mml").forEach(e => e.remove()) });
+      if (!canvas.width || !canvas.height) continue;
+      const h = CW * canvas.height / canvas.width;
+      if (y + h > PH - MB && y > MT + 1) { pdf.addPage(); y = MT; }
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", ML, y, CW, Math.min(h, PH - MB - MT), undefined, "FAST");
+      y += h + 1.5;
+    }
+    const n = pdf.getNumberOfPages(), title = repTitle() || "Horisontaltrykk mot vegg fra fundamentlast";
+    const date = new Date().toLocaleDateString("nb-NO", { day: "2-digit", month: "2-digit", year: "numeric" });
+    for (let k = 1; k <= n; k++) {
+      pdf.setPage(k);
+      pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.setTextColor(91, 104, 115);
+      pdf.text(title.length > 90 ? title.slice(0, 88) + "…" : title, ML, 10);
+      pdf.text(date, PW - MR, 10, { align: "right" });
+      pdf.setDrawColor(201, 208, 210); pdf.setLineWidth(0.2); pdf.line(ML, 12, PW - MR, 12);
+      pdf.line(ML, PH - 11, PW - MR, PH - 11);
+      pdf.text("Horisontaltrykk fra fundamentlast – elastisitetsteori", ML, PH - 7);
+      pdf.text(`Side ${k} av ${n}`, PW - MR, PH - 7, { align: "right" });
+    }
+    const base = (repTitle() || "horisontaltrykk").replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, "_").slice(0, 80);
+    const filename = `${base}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    const blob = pdf.output("blob");
+    const res = await saveFile(filename, blob);
+    msg.textContent = res === "saved" ? "PDF lagret: " + filename : res;
+  } catch (e) {
+    console.error(e); msg.textContent = "Noe gikk galt under PDF-eksporten: " + (e && e.message || e);
+  } finally {
+    w.hidden = wasHidden;
+    btn.disabled = false; btn.textContent = "Eksporter til PDF";
+  }
+}
+$("pdfBtn").addEventListener("click", exportPdf);
+
+update();
+
+// ---------- Felles lagring og txt-eksport ----------
+async function saveFile(filename, blob) {
+  let dl = null;
+  try { dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) { dl = null; }
+  if (dl) {
+    try { await dl.save({ filename, data: blob }); return "saved"; }
+    catch (e) { return e && e.code === "declined" ? "Lagringen ble avbrutt." : "Filen kunne ikke lagres her (" + (e && e.code || "ukjent feil") + ")."; }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  return "saved";
+}
+const xl = v => String(Number(v.toPrecision(6))).replace(".", ",");
+$("txtBtn").addEventListener("click", async () => {
+  const msg = $("txtMsg");
+  if (!last) { msg.textContent = "Rett opp inndata før eksport."; return; }
+  const lines = ["z (m)\tsigma_x,tot (kPa)"];
+  for (const x of last.r.rows) lines.push(xl(x.z) + "\t" + xl(x.sx));
+  const base = (repTitle() || "horisontaltrykk").replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, "_").slice(0, 80);
+  const filename = `${base}_sigma_x.txt`;
+  const res = await saveFile(filename, new Blob([lines.join("\r\n") + "\r\n"], { type: "text/plain" }));
+  msg.textContent = res === "saved" ? "Lagret: " + filename : res;
+});
+</script></body></html>
